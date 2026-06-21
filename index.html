@@ -66,6 +66,15 @@
     opacity:0;pointer-events:none;transition:.25s;z-index:99}
   .toast.show{opacity:1}
   .hint{font-size:13px;color:var(--muted);margin-top:8px}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);
+    color:#fff;border-radius:99px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .chip:hover{background:rgba(255,255,255,.28)}
+  .codebox{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px;font-size:12.5px;
+    line-height:1.5;overflow:auto;max-height:340px;white-space:pre;font-family:Consolas,"Courier New",monospace}
+  .step{display:flex;gap:10px;margin-bottom:12px}
+  .step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .step .t{flex:1;padding-top:2px}
   .total-line{font-size:20px;font-weight:800;color:var(--brand)}
   @media(max-width:600px){
     header h1{font-size:16px}
@@ -77,6 +86,7 @@
 <header>
   <h1>📒 客戶銷貨系統</h1>
   <div class="tools">
+    <span id="syncChip" class="chip" onclick="switchTab('cloud')" title="點我開啟雲端同步設定">⚪ 本機</span>
     <button class="btn sec sm" onclick="backupData()">💾 備份匯出</button>
     <button class="btn sec sm" onclick="document.getElementById('restoreFile').click()">📂 還原匯入</button>
     <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreData(event)">
@@ -88,6 +98,7 @@
   <button data-tab="list" onclick="switchTab('list')">🗂 銷貨明細 / 統計</button>
   <button data-tab="product" onclick="switchTab('product')">📦 商品管理</button>
   <button data-tab="customer" onclick="switchTab('customer')">👥 客戶管理</button>
+  <button data-tab="cloud" onclick="switchTab('cloud')">☁️ 雲端同步</button>
 </nav>
 
 <main>
@@ -253,6 +264,51 @@
       </table></div>
     </div>
   </section>
+
+  <!-- ========== 雲端同步 ========== -->
+  <section id="tab-cloud" class="tab">
+    <div class="card">
+      <h2>☁️ 雲端同步（Google 試算表）</h2>
+      <p class="hint" style="margin-top:0">設定後，手機與電腦會看到同一份資料。資料存在你自己的 Google 試算表。
+        每台裝置都要貼一次下面的「同步網址」。</p>
+      <div style="margin:14px 0">
+        <label>同步網址（你的 Apps Script 網頁應用程式 URL）</label>
+        <input id="cloud_url" placeholder="貼上 https://script.google.com/macros/s/..../exec">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ok" onclick="cloudConnect()">🔗 儲存網址並連線</button>
+        <button class="btn sec" onclick="cloudPull(true)">⬇️ 重新載入雲端</button>
+        <button class="btn sec" onclick="cloudPushManual()">⬆️ 把本機資料上傳雲端</button>
+        <button class="btn danger" onclick="cloudDisconnect()">中斷連線</button>
+      </div>
+      <p class="hint" id="cloudStatus">目前狀態：未連線（僅存本機）。</p>
+      <p class="hint">⚠️ 第一次設定時：先在「資料較完整的那台裝置」按
+        <b>⬆️ 把本機資料上傳雲端</b>，其他裝置再按 <b>⬇️ 重新載入雲端</b>，避免覆蓋掉資料。</p>
+    </div>
+
+    <div class="card">
+      <h2>📋 第一次設定步驟（約 5 分鐘，只需做一次）</h2>
+      <div class="step"><div class="n">1</div><div class="t">
+        到 <a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> 建立一個新的 Google 試算表，命名例如「銷貨資料庫」。</div></div>
+      <div class="step"><div class="n">2</div><div class="t">
+        上方選單 <b>擴充功能 → Apps Script</b>，會開啟一個程式編輯器分頁。</div></div>
+      <div class="step"><div class="n">3</div><div class="t">
+        把編輯器裡原本的內容<b>全部刪除</b>，改貼下面這整段程式碼（按右上角「複製」）。</div></div>
+      <div class="step"><div class="n">4</div><div class="t">
+        按 <b>儲存</b>（💾），再按 <b>部署 → 新增部署作業</b>；類型選 <b>網頁應用程式</b>；
+        「執行身分」選 <b>我</b>；「誰可以存取」選 <b>任何人</b>，按 <b>部署</b>。</div></div>
+      <div class="step"><div class="n">5</div><div class="t">
+        第一次會要你<b>授權</b>：選你的 Google 帳號 →（若出現「未驗證」）點「進階 → 前往…（不安全）」→ 允許。</div></div>
+      <div class="step"><div class="n">6</div><div class="t">
+        複製最後出現的<b>網頁應用程式網址</b>（結尾是 <code>/exec</code>），貼回本頁最上面的「同步網址」欄，按
+        <b>🔗 儲存網址並連線</b>。完成！</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
+        <b>Apps Script 程式碼</b>
+        <button class="btn sm" onclick="copyGS()">📋 複製程式碼</button>
+      </div>
+      <div class="codebox" id="gsCode"></div>
+    </div>
+  </section>
 </main>
 
 <div class="toast" id="toast"></div>
@@ -260,7 +316,10 @@
 <script>
 /* ===================== 資料層 (LocalStorage) ===================== */
 const DB_KEY = "sales_system_v1";
+const CLOUD_URL_KEY = "sales_cloud_url";
 let db = { products:[], customers:[], sales:[] };
+let cloudUrl = localStorage.getItem(CLOUD_URL_KEY) || "";
+let pushTimer = null, pulling = false;
 
 function loadDB(){
   try{
@@ -271,7 +330,7 @@ function loadDB(){
   db.customers = db.customers || [];
   db.sales = db.sales || [];
 }
-function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(db)); schedulePush(); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
 /* ===================== 共用工具 ===================== */
@@ -299,6 +358,7 @@ function switchTab(name){
   if(name==='list'){ refreshListFilters(); renderList(); }
   if(name==='product') renderProducts();
   if(name==='customer') renderCustomers();
+  if(name==='cloud') renderCloud();
 }
 
 /* ===================== 銷貨登錄 ===================== */
@@ -648,11 +708,172 @@ function restoreData(ev){
   reader.readAsText(file);
 }
 
+/* ===================== 雲端同步 (Google 試算表) ===================== */
+function setSyncChip(state, text){
+  const chip=document.getElementById('syncChip');
+  const icon={local:'⚪',ok:'🟢',sync:'🔵',err:'🔴'}[state]||'⚪';
+  chip.textContent=icon+' '+text;
+}
+function setCloudStatus(text){
+  const el=document.getElementById('cloudStatus'); if(el) el.textContent='目前狀態：'+text;
+}
+function refreshAllViews(){
+  refreshSaleSelects(); renderRecent(); renderProducts(); renderCustomers(); renderList();
+}
+function applyCloud(data){
+  db={ products:data.products||[], customers:data.customers||[], sales:data.sales||[] };
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  refreshAllViews(); setSyncChip('ok','已同步');
+}
+function renderCloud(){
+  document.getElementById('cloud_url').value=cloudUrl;
+  document.getElementById('gsCode').textContent=GS_CODE;
+  setCloudStatus(cloudUrl?'已連線。資料會自動同步。':'未連線（僅存本機）。');
+}
+function copyGS(){
+  navigator.clipboard.writeText(GS_CODE).then(
+    ()=>toast('已複製程式碼，回 Apps Script 貼上'),
+    ()=>toast('複製失敗，請手動選取複製'));
+}
+function isCloudUrl(u){ return /^https:\/\/script\.google\.com\/.*\/exec$/.test(u); }
+
+function doPushNow(onDone){
+  if(!cloudUrl) return;
+  setSyncChip('sync','同步中…');
+  fetch(cloudUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(db)})
+    .then(r=>r.json())
+    .then(()=>{ setSyncChip('ok','已同步'); if(onDone)onDone(true); })
+    .catch(()=>{ setSyncChip('err','同步失敗'); if(onDone)onDone(false); });
+}
+function schedulePush(){
+  if(!cloudUrl) return;
+  setSyncChip('sync','同步中…');
+  clearTimeout(pushTimer); pushTimer=setTimeout(()=>doPushNow(),800);
+}
+function cloudConnect(){
+  const url=document.getElementById('cloud_url').value.trim();
+  if(!isCloudUrl(url)) return toast('網址格式不對，應以 /exec 結尾');
+  cloudUrl=url; localStorage.setItem(CLOUD_URL_KEY,url);
+  setSyncChip('sync','連線中…'); setCloudStatus('連線中…');
+  fetch(cloudUrl,{method:'GET'}).then(r=>r.json()).then(data=>{
+    if(!data||!data.products) throw 0;
+    const cloudHas=(data.products.length+data.customers.length+data.sales.length)>0;
+    const localHas=(db.products.length+db.customers.length+db.sales.length)>0;
+    if(cloudHas){
+      if(confirm('雲端已有資料。要用「雲端資料」覆蓋這台裝置嗎？\n確定＝載入雲端；取消＝保留本機（稍後可手動上傳）')){
+        applyCloud(data); setCloudStatus('已連線，已載入雲端資料。'); toast('已從雲端載入');
+      }else{ setSyncChip('ok','已連線'); setCloudStatus('已連線（保留本機，未覆蓋）。'); }
+    }else if(localHas){
+      if(confirm('雲端是空的，這台有資料。要把「本機資料」上傳到雲端嗎？')){
+        doPushNow(ok=>{ setCloudStatus(ok?'已連線，本機資料已上傳雲端。':'上傳失敗，請檢查部署設定。');
+          if(ok) toast('已上傳到雲端'); });
+      }else{ setSyncChip('ok','已連線'); setCloudStatus('已連線（雲端為空）。'); }
+    }else{ setSyncChip('ok','已連線'); setCloudStatus('已連線（雙方皆空，開始使用即可）。'); }
+  }).catch(()=>{
+    setSyncChip('err','連線失敗');
+    setCloudStatus('連線失敗：請確認網址正確、且部署時「誰可以存取」選了「任何人」。');
+    toast('連線失敗，請檢查網址');
+  });
+}
+function cloudPull(manual){
+  if(!cloudUrl) return toast('請先設定同步網址');
+  if(manual && !confirm('用「雲端資料」覆蓋這台裝置目前的資料？')) return;
+  if(pulling) return; pulling=true; setSyncChip('sync','載入中…');
+  fetch(cloudUrl,{method:'GET'}).then(r=>r.json()).then(data=>{
+    if(!data||!data.products) throw 0;
+    applyCloud(data); setCloudStatus('已連線。資料會自動同步。');
+    if(manual) toast('已從雲端載入');
+  }).catch(()=>{
+    setSyncChip('err','連線失敗'); setCloudStatus('連線失敗：請確認網址與部署設定。');
+    if(manual) toast('連線失敗');
+  }).finally(()=>{ pulling=false; });
+}
+function cloudPushManual(){
+  if(!cloudUrl) return toast('請先設定同步網址');
+  if(!confirm('將用「本機目前資料」覆蓋雲端，確定？')) return;
+  setCloudStatus('上傳中…');
+  doPushNow(ok=>{ setCloudStatus(ok?'已上傳到雲端。':'上傳失敗，請檢查部署設定。');
+    toast(ok?'已上傳到雲端':'上傳失敗'); });
+}
+function cloudDisconnect(){
+  if(!confirm('中斷後本機仍可使用，但不再與雲端同步。確定？')) return;
+  cloudUrl=''; localStorage.removeItem(CLOUD_URL_KEY);
+  setSyncChip('local','本機'); setCloudStatus('已中斷連線（僅存本機）。'); toast('已中斷雲端連線');
+}
+
+const GS_CODE = `// 客戶銷貨系統 — Google 試算表後端（請整段貼到 Apps Script，存檔後部署為網頁應用程式）
+var TABLES = {
+  products:  ['id','code','name','spec','price'],
+  customers: ['id','name','phone','note'],
+  sales:     ['id','date','productId','code','product','spec','qty','price','total','customerId','customer','note']
+};
+
+function doGet(e){ return out(readAll()); }
+
+function doPost(e){
+  var data = JSON.parse(e.postData.contents);
+  writeAll(data);
+  return out({ ok:true });
+}
+
+function readAll(){
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var result = {};
+  Object.keys(TABLES).forEach(function(name){
+    var cols = TABLES[name];
+    var sh = ss.getSheetByName(name);
+    var arr = [];
+    if(sh){
+      var values = sh.getDataRange().getValues();
+      for(var i=1;i<values.length;i++){
+        var row = values[i];
+        if(row.join('') === '') continue;
+        var obj = {};
+        for(var j=0;j<cols.length;j++){ obj[cols[j]] = row[j]; }
+        arr.push(obj);
+      }
+    }
+    result[name] = arr;
+  });
+  return result;
+}
+
+function writeAll(data){
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Object.keys(TABLES).forEach(function(name){
+    var cols = TABLES[name];
+    var sh = ss.getSheetByName(name);
+    if(!sh){ sh = ss.insertSheet(name); }
+    sh.clearContents();
+    var rows = [cols];
+    var list = data[name] || [];
+    list.forEach(function(item){
+      rows.push(cols.map(function(c){ return item[c]==null ? '' : item[c]; }));
+    });
+    var range = sh.getRange(1,1,rows.length,cols.length);
+    range.setNumberFormat('@');
+    range.setValues(rows);
+  });
+}
+
+function out(obj){
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
 /* ===================== 初始化 ===================== */
 loadDB();
 resetSaleForm();
 refreshSaleSelects();
 renderRecent();
+if(cloudUrl){
+  setSyncChip('sync','載入中…');
+  fetch(cloudUrl,{method:'GET'}).then(r=>r.json()).then(data=>{
+    if(!data||!data.products) throw 0; applyCloud(data);
+  }).catch(()=>setSyncChip('err','離線（用本機）'));
+}else{
+  setSyncChip('local','本機');
+}
 </script>
 </body>
 </html>
