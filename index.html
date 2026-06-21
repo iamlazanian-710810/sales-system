@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客戶銷貨系統</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#f4f6f9; --card:#ffffff; --ink:#1f2937; --muted:#6b7280;
@@ -268,45 +269,46 @@
   <!-- ========== 雲端同步 ========== -->
   <section id="tab-cloud" class="tab">
     <div class="card">
-      <h2>☁️ 雲端同步（Google 試算表）</h2>
-      <p class="hint" style="margin-top:0">設定後，手機與電腦會看到同一份資料。資料存在你自己的 Google 試算表。
-        每台裝置都要貼一次下面的「同步網址」。</p>
+      <h2>☁️ 雲端同步（Supabase）</h2>
+      <p class="hint" style="margin-top:0">設定後，手機與電腦看同一份資料，且<b>多人/多裝置即時同步</b>。
+        每台裝置只要貼一次下面的「連線網址」與「金鑰」即可。</p>
       <div style="margin:14px 0">
-        <label>同步網址（你的 Apps Script 網頁應用程式 URL）</label>
-        <input id="cloud_url" placeholder="貼上 https://script.google.com/macros/s/..../exec">
+        <label>Supabase 連線網址（Project URL）</label>
+        <input id="sb_url" placeholder="https://xxxx.supabase.co">
+      </div>
+      <div style="margin:14px 0">
+        <label>Supabase 金鑰（anon public key）</label>
+        <input id="sb_key" placeholder="eyJ...（很長一串）">
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn ok" onclick="cloudConnect()">🔗 儲存網址並連線</button>
-        <button class="btn sec" onclick="cloudPull(true)">⬇️ 重新載入雲端</button>
-        <button class="btn sec" onclick="cloudPushManual()">⬆️ 把本機資料上傳雲端</button>
-        <button class="btn danger" onclick="cloudDisconnect()">中斷連線</button>
+        <button class="btn ok" onclick="sbConnect()">🔗 儲存並連線</button>
+        <button class="btn sec" onclick="sbReload()">🔄 重新載入</button>
+        <button class="btn sec" onclick="sbUploadLocal()">⬆️ 把本機資料上傳雲端</button>
+        <button class="btn danger" onclick="sbDisconnect()">中斷連線</button>
       </div>
       <p class="hint" id="cloudStatus">目前狀態：未連線（僅存本機）。</p>
-      <p class="hint">⚠️ 第一次設定時：先在「資料較完整的那台裝置」按
-        <b>⬆️ 把本機資料上傳雲端</b>，其他裝置再按 <b>⬇️ 重新載入雲端</b>，避免覆蓋掉資料。</p>
+      <p class="hint">⚠️ 第一次設定：先在「資料最完整的那台」連線後按
+        <b>⬆️ 把本機資料上傳雲端</b>，其他裝置連線後資料就會自動出現。</p>
     </div>
 
     <div class="card">
-      <h2>📋 第一次設定步驟（約 5 分鐘，只需做一次）</h2>
+      <h2>📋 第一次設定步驟（只需做一次）</h2>
       <div class="step"><div class="n">1</div><div class="t">
-        到 <a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> 建立一個新的 Google 試算表，命名例如「銷貨資料庫」。</div></div>
+        登入 <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">supabase.com</a>，
+        打開你的專案（就是 lunch-order 那個）。</div></div>
       <div class="step"><div class="n">2</div><div class="t">
-        上方選單 <b>擴充功能 → Apps Script</b>，會開啟一個程式編輯器分頁。</div></div>
+        左側點 <b>SQL Editor → New query</b>，把下面整段 SQL 貼上（按「複製 SQL」），按 <b>Run</b>。
+        看到成功訊息即建好資料表。</div></div>
       <div class="step"><div class="n">3</div><div class="t">
-        把編輯器裡原本的內容<b>全部刪除</b>，改貼下面這整段程式碼（按右上角「複製」）。</div></div>
+        回本頁上方，把 <b>連線網址</b> 與 <b>金鑰</b> 貼進去（我會把值給你），按
+        <b>🔗 儲存並連線</b>。</div></div>
       <div class="step"><div class="n">4</div><div class="t">
-        按 <b>儲存</b>（💾），再按 <b>部署 → 新增部署作業</b>；類型選 <b>網頁應用程式</b>；
-        「執行身分」選 <b>我</b>；「誰可以存取」選 <b>任何人</b>，按 <b>部署</b>。</div></div>
-      <div class="step"><div class="n">5</div><div class="t">
-        第一次會要你<b>授權</b>：選你的 Google 帳號 →（若出現「未驗證」）點「進階 → 前往…（不安全）」→ 允許。</div></div>
-      <div class="step"><div class="n">6</div><div class="t">
-        複製最後出現的<b>網頁應用程式網址</b>（結尾是 <code>/exec</code>），貼回本頁最上面的「同步網址」欄，按
-        <b>🔗 儲存網址並連線</b>。完成！</div></div>
+        在資料最完整的裝置按 <b>⬆️ 把本機資料上傳雲端</b>。其他手機/電腦貼一樣的網址金鑰連線即可。完成！</div></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
-        <b>Apps Script 程式碼</b>
-        <button class="btn sm" onclick="copyGS()">📋 複製程式碼</button>
+        <b>建表 SQL</b>
+        <button class="btn sm" onclick="copySQL()">📋 複製 SQL</button>
       </div>
-      <div class="codebox" id="gsCode"></div>
+      <div class="codebox" id="sqlCode"></div>
     </div>
   </section>
 </main>
@@ -316,10 +318,13 @@
 <script>
 /* ===================== 資料層 (LocalStorage) ===================== */
 const DB_KEY = "sales_system_v1";
-const CLOUD_URL_KEY = "sales_cloud_url";
+const SB_URL_KEY = "sales_sb_url";
+const SB_KEY_KEY = "sales_sb_key";
 let db = { products:[], customers:[], sales:[] };
-let cloudUrl = localStorage.getItem(CLOUD_URL_KEY) || "";
-let pushTimer = null, pulling = false;
+let sbUrl = localStorage.getItem(SB_URL_KEY) || "";
+let sbKey = localStorage.getItem(SB_KEY_KEY) || "";
+let sb = null, sbReady = false, sbRefetchTimer = null;
+const T = { products:'sales_products', customers:'sales_customers', sales:'sales_records' };
 
 function loadDB(){
   try{
@@ -329,8 +334,13 @@ function loadDB(){
   db.products = db.products || [];
   db.customers = db.customers || [];
   db.sales = db.sales || [];
+  // 相容舊資料：camelCase 欄位 → snake_case（配合 Supabase 欄位）
+  db.sales.forEach(s=>{
+    if(s.productId!==undefined && s.product_id===undefined){ s.product_id=s.productId; delete s.productId; }
+    if(s.customerId!==undefined && s.customer_id===undefined){ s.customer_id=s.customerId; delete s.customerId; }
+  });
 }
-function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(db)); schedulePush(); }
+function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
 /* ===================== 共用工具 ===================== */
@@ -397,9 +407,9 @@ function saveSale(){
   const p = db.products.find(x=>x.id===prodId);
   const c = db.customers.find(x=>x.id===custId);
   const rec = {
-    date, productId:prodId, code:p.code, product:p.name, spec:(p.spec||''),
+    date, product_id:prodId, code:p.code, product:p.name, spec:(p.spec||''),
     qty, price, total:qty*price,
-    customerId:custId, customer:c.name,
+    customer_id:custId, customer:c.name,
     note: document.getElementById('f_note').value.trim()
   };
   const editId = document.getElementById('saleEditId').value;
@@ -409,7 +419,7 @@ function saveSale(){
   }else{
     rec.id = uid(); db.sales.push(rec); toast('已新增銷貨單');
   }
-  saveDB(); resetSaleForm(); renderRecent();
+  saveDB(); supaUpsert(T.sales, rec); resetSaleForm(); renderRecent();
 }
 function resetSaleForm(){
   document.getElementById('saleEditId').value='';
@@ -430,12 +440,12 @@ function editSale(id){
   switchTab('sale');
   document.getElementById('saleEditId').value=s.id;
   document.getElementById('f_date').value=s.date;
-  document.getElementById('f_product').value=s.productId||'';
+  document.getElementById('f_product').value=s.product_id||'';
   document.getElementById('f_code').value=s.code;
   document.getElementById('f_spec').value=s.spec||'';
   document.getElementById('f_qty').value=s.qty;
   document.getElementById('f_price').value=s.price;
-  document.getElementById('f_customer').value=s.customerId||'';
+  document.getElementById('f_customer').value=s.customer_id||'';
   document.getElementById('f_note').value=s.note||'';
   calcTotal();
   document.getElementById('saleFormTitle').textContent='編輯銷貨單';
@@ -444,7 +454,7 @@ function editSale(id){
 }
 function delSale(id){
   if(!confirm('確定刪除這筆銷貨單?')) return;
-  db.sales = db.sales.filter(s=>s.id!==id); saveDB();
+  db.sales = db.sales.filter(s=>s.id!==id); saveDB(); supaDelete(T.sales, id);
   renderRecent(); renderList(); toast('已刪除');
 }
 function renderRecent(){
@@ -546,14 +556,15 @@ function saveProduct(){
   if(!name) return toast('請輸入品項名稱');
   const editId=document.getElementById('prodEditId').value;
   if(db.products.some(p=>p.code===code && p.id!==editId)) return toast('品號重複');
+  let row;
   if(editId){
-    const p=db.products.find(x=>x.id===editId);
-    p.code=code; p.name=name; p.spec=spec; p.price=price; toast('已更新商品');
+    row=db.products.find(x=>x.id===editId);
+    row.code=code; row.name=name; row.spec=spec; row.price=price; toast('已更新商品');
   }else{
     if(db.products.length>=50) return toast('商品數量過多');
-    db.products.push({id:uid(),code,name,spec,price}); toast('已新增商品');
+    row={id:uid(),code,name,spec,price}; db.products.push(row); toast('已新增商品');
   }
-  saveDB(); resetProductForm(); renderProducts();
+  saveDB(); supaUpsert(T.products, row); resetProductForm(); renderProducts();
 }
 function resetProductForm(){
   document.getElementById('prodEditId').value='';
@@ -577,10 +588,10 @@ function editProduct(id){
 }
 function delProduct(id){
   const p=db.products.find(x=>x.id===id); if(!p) return;
-  const used=db.sales.filter(s=>s.productId===id).length;
+  const used=db.sales.filter(s=>s.product_id===id).length;
   if(used && !confirm(`此商品已有 ${used} 筆銷貨紀錄,刪除商品不會刪除舊紀錄。確定刪除?`)) return;
   if(!used && !confirm('確定刪除此商品?')) return;
-  db.products=db.products.filter(x=>x.id!==id); saveDB(); renderProducts(); toast('已刪除');
+  db.products=db.products.filter(x=>x.id!==id); saveDB(); supaDelete(T.products, id); renderProducts(); toast('已刪除');
 }
 function renderProducts(){
   document.getElementById('prodCount').textContent=db.products.length;
@@ -601,13 +612,14 @@ function saveCustomer(){
   if(!name) return toast('請輸入客戶名稱');
   const editId=document.getElementById('custEditId').value;
   if(db.customers.some(c=>c.name===name && c.id!==editId)) return toast('客戶名稱重複');
+  let row;
   if(editId){
-    const c=db.customers.find(x=>x.id===editId);
-    c.name=name; c.phone=phone; c.note=note; toast('已更新客戶');
+    row=db.customers.find(x=>x.id===editId);
+    row.name=name; row.phone=phone; row.note=note; toast('已更新客戶');
   }else{
-    db.customers.push({id:uid(),name,phone,note}); toast('已新增客戶');
+    row={id:uid(),name,phone,note}; db.customers.push(row); toast('已新增客戶');
   }
-  saveDB(); resetCustomerForm(); renderCustomers();
+  saveDB(); supaUpsert(T.customers, row); resetCustomerForm(); renderCustomers();
 }
 function resetCustomerForm(){
   document.getElementById('custEditId').value='';
@@ -628,10 +640,10 @@ function editCustomer(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function delCustomer(id){
-  const used=db.sales.filter(s=>s.customerId===id).length;
+  const used=db.sales.filter(s=>s.customer_id===id).length;
   if(used && !confirm(`此客戶已有 ${used} 筆銷貨紀錄,刪除客戶不會刪除舊紀錄。確定刪除?`)) return;
   if(!used && !confirm('確定刪除此客戶?')) return;
-  db.customers=db.customers.filter(x=>x.id!==id); saveDB(); renderCustomers(); toast('已刪除');
+  db.customers=db.customers.filter(x=>x.id!==id); saveDB(); supaDelete(T.customers, id); renderCustomers(); toast('已刪除');
 }
 function renderCustomers(){
   document.getElementById('custCount').textContent=db.customers.length;
@@ -699,8 +711,13 @@ function restoreData(ev){
       const obj=JSON.parse(reader.result);
       if(!obj.products||!obj.customers||!obj.sales) throw 0;
       if(!confirm('還原會覆蓋目前所有資料,確定繼續?')) return;
-      db=obj; saveDB();
-      switchTab('sale');
+      db={products:obj.products,customers:obj.customers,sales:obj.sales};
+      db.sales.forEach(s=>{
+        if(s.productId!==undefined && s.product_id===undefined){ s.product_id=s.productId; delete s.productId; }
+        if(s.customerId!==undefined && s.customer_id===undefined){ s.customer_id=s.customerId; delete s.customerId; }
+      });
+      saveDB(); refreshAllViews();
+      if(sbReady) sbUploadLocal();
       toast('已還原備份');
     }catch(e){ toast('檔案格式錯誤,無法還原'); }
     ev.target.value='';
@@ -708,7 +725,7 @@ function restoreData(ev){
   reader.readAsText(file);
 }
 
-/* ===================== 雲端同步 (Google 試算表) ===================== */
+/* ===================== 雲端同步 (Supabase) ===================== */
 function setSyncChip(state, text){
   const chip=document.getElementById('syncChip');
   const icon={local:'⚪',ok:'🟢',sync:'🔵',err:'🔴'}[state]||'⚪';
@@ -720,157 +737,154 @@ function setCloudStatus(text){
 function refreshAllViews(){
   refreshSaleSelects(); renderRecent(); renderProducts(); renderCustomers(); renderList();
 }
-function applyCloud(data){
-  db={ products:data.products||[], customers:data.customers||[], sales:data.sales||[] };
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-  refreshAllViews(); setSyncChip('ok','已同步');
-}
 function renderCloud(){
-  document.getElementById('cloud_url').value=cloudUrl;
-  document.getElementById('gsCode').textContent=GS_CODE;
-  setCloudStatus(cloudUrl?'已連線。資料會自動同步。':'未連線（僅存本機）。');
+  document.getElementById('sb_url').value=sbUrl;
+  document.getElementById('sb_key').value=sbKey;
+  document.getElementById('sqlCode').textContent=SQL_CODE;
+  setCloudStatus(sbReady?'已連線，多裝置即時同步中。':(sbUrl?'已設定，但尚未連線成功。':'未連線（僅存本機）。'));
 }
-function copyGS(){
-  navigator.clipboard.writeText(GS_CODE).then(
-    ()=>toast('已複製程式碼，回 Apps Script 貼上'),
+function copySQL(){
+  navigator.clipboard.writeText(SQL_CODE).then(
+    ()=>toast('已複製 SQL，回 Supabase 貼上'),
     ()=>toast('複製失敗，請手動選取複製'));
 }
-function isCloudUrl(u){ return /^https:\/\/script\.google\.com\/.*\/exec$/.test(u); }
-
-function doPushNow(onDone){
-  if(!cloudUrl) return;
-  setSyncChip('sync','同步中…');
-  fetch(cloudUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(db)})
-    .then(r=>r.json())
-    .then(()=>{ setSyncChip('ok','已同步'); if(onDone)onDone(true); })
-    .catch(()=>{ setSyncChip('err','同步失敗'); if(onDone)onDone(false); });
+function sbInit(){
+  if(!sbUrl || !sbKey) return false;
+  if(!window.supabase || !window.supabase.createClient) return false;
+  try{ sb = window.supabase.createClient(sbUrl, sbKey); return true; }
+  catch(e){ console.error(e); return false; }
 }
-function schedulePush(){
-  if(!cloudUrl) return;
-  setSyncChip('sync','同步中…');
-  clearTimeout(pushTimer); pushTimer=setTimeout(()=>doPushNow(),800);
+async function sbFetchAll(){
+  const [p,c,s] = await Promise.all([
+    sb.from(T.products).select('*'),
+    sb.from(T.customers).select('*'),
+    sb.from(T.sales).select('*')
+  ]);
+  if(p.error) throw p.error;
+  if(c.error) throw c.error;
+  if(s.error) throw s.error;
+  db = { products:p.data||[], customers:c.data||[], sales:s.data||[] };
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  refreshAllViews();
 }
-function cloudConnect(){
-  const url=document.getElementById('cloud_url').value.trim();
-  if(!isCloudUrl(url)) return toast('網址格式不對，應以 /exec 結尾');
-  cloudUrl=url; localStorage.setItem(CLOUD_URL_KEY,url);
-  setSyncChip('sync','連線中…'); setCloudStatus('連線中…');
-  fetch(cloudUrl,{method:'GET'}).then(r=>r.json()).then(data=>{
-    if(!data||!data.products) throw 0;
-    const cloudHas=(data.products.length+data.customers.length+data.sales.length)>0;
-    const localHas=(db.products.length+db.customers.length+db.sales.length)>0;
-    if(cloudHas){
-      if(confirm('雲端已有資料。要用「雲端資料」覆蓋這台裝置嗎？\n確定＝載入雲端；取消＝保留本機（稍後可手動上傳）')){
-        applyCloud(data); setCloudStatus('已連線，已載入雲端資料。'); toast('已從雲端載入');
-      }else{ setSyncChip('ok','已連線'); setCloudStatus('已連線（保留本機，未覆蓋）。'); }
-    }else if(localHas){
-      if(confirm('雲端是空的，這台有資料。要把「本機資料」上傳到雲端嗎？')){
-        doPushNow(ok=>{ setCloudStatus(ok?'已連線，本機資料已上傳雲端。':'上傳失敗，請檢查部署設定。');
-          if(ok) toast('已上傳到雲端'); });
-      }else{ setSyncChip('ok','已連線'); setCloudStatus('已連線（雲端為空）。'); }
-    }else{ setSyncChip('ok','已連線'); setCloudStatus('已連線（雙方皆空，開始使用即可）。'); }
-  }).catch(()=>{
-    setSyncChip('err','連線失敗');
-    setCloudStatus('連線失敗：請確認網址正確、且部署時「誰可以存取」選了「任何人」。');
-    toast('連線失敗，請檢查網址');
+function sbSubscribe(){
+  try{
+    sb.channel('sales-sync')
+      .on('postgres_changes',{event:'*',schema:'public',table:T.products}, sbOnRemoteChange)
+      .on('postgres_changes',{event:'*',schema:'public',table:T.customers}, sbOnRemoteChange)
+      .on('postgres_changes',{event:'*',schema:'public',table:T.sales}, sbOnRemoteChange)
+      .subscribe();
+  }catch(e){ console.error(e); }
+}
+function sbOnRemoteChange(){
+  clearTimeout(sbRefetchTimer);
+  sbRefetchTimer=setTimeout(()=>{
+    if(!sbReady) return;
+    sbFetchAll().then(()=>setSyncChip('ok','已同步')).catch(()=>{});
+  }, 400);
+}
+function supaUpsert(table, row){
+  if(!sbReady) return;
+  setSyncChip('sync','同步中…');
+  sb.from(table).upsert(row).then(({error})=>{
+    setSyncChip(error?'err':'ok', error?'同步失敗':'已同步');
+    if(error) console.error(error);
   });
 }
-function cloudPull(manual){
-  if(!cloudUrl) return toast('請先設定同步網址');
-  if(manual && !confirm('用「雲端資料」覆蓋這台裝置目前的資料？')) return;
-  if(pulling) return; pulling=true; setSyncChip('sync','載入中…');
-  fetch(cloudUrl,{method:'GET'}).then(r=>r.json()).then(data=>{
-    if(!data||!data.products) throw 0;
-    applyCloud(data); setCloudStatus('已連線。資料會自動同步。');
-    if(manual) toast('已從雲端載入');
-  }).catch(()=>{
-    setSyncChip('err','連線失敗'); setCloudStatus('連線失敗：請確認網址與部署設定。');
-    if(manual) toast('連線失敗');
-  }).finally(()=>{ pulling=false; });
+function supaDelete(table, id){
+  if(!sbReady) return;
+  setSyncChip('sync','同步中…');
+  sb.from(table).delete().eq('id',id).then(({error})=>{
+    setSyncChip(error?'err':'ok', error?'同步失敗':'已同步');
+    if(error) console.error(error);
+  });
 }
-function cloudPushManual(){
-  if(!cloudUrl) return toast('請先設定同步網址');
-  if(!confirm('將用「本機目前資料」覆蓋雲端，確定？')) return;
-  setCloudStatus('上傳中…');
-  doPushNow(ok=>{ setCloudStatus(ok?'已上傳到雲端。':'上傳失敗，請檢查部署設定。');
-    toast(ok?'已上傳到雲端':'上傳失敗'); });
+function sbConnect(){
+  const url=document.getElementById('sb_url').value.trim().replace(/\/+$/,'');
+  const key=document.getElementById('sb_key').value.trim();
+  if(!/^https:\/\/.+\.supabase\.co$/.test(url)) return toast('連線網址格式不對（應像 https://xxxx.supabase.co）');
+  if(key.length<20) return toast('金鑰看起來不正確');
+  sbUrl=url; sbKey=key;
+  localStorage.setItem(SB_URL_KEY,url); localStorage.setItem(SB_KEY_KEY,key);
+  if(!sbInit()) return toast('連線元件尚未載入，請重新整理頁面再試');
+  setSyncChip('sync','連線中…'); setCloudStatus('連線中…');
+  sbFetchAll().then(()=>{
+    sbReady=true; sbSubscribe();
+    setSyncChip('ok','已同步'); setCloudStatus('已連線，多裝置即時同步中。'); toast('已連線雲端');
+  }).catch(err=>{
+    sbReady=false; console.error(err);
+    setSyncChip('err','連線失敗');
+    setCloudStatus('連線失敗：請確認已在 Supabase 執行建表 SQL，且網址/金鑰正確。');
+    toast('連線失敗，請先在 Supabase 執行建表 SQL');
+  });
 }
-function cloudDisconnect(){
+function sbReload(){
+  if(!sbReady) return toast('尚未連線');
+  setSyncChip('sync','載入中…');
+  sbFetchAll().then(()=>{ setSyncChip('ok','已同步'); toast('已重新載入'); })
+    .catch(()=>{ setSyncChip('err','載入失敗'); toast('載入失敗'); });
+}
+function sbUploadLocal(){
+  if(!sbReady) return toast('請先連線雲端');
+  if(!confirm('把本機目前的商品/客戶/銷貨全部上傳到雲端（同 id 會覆蓋），確定？')) return;
+  setSyncChip('sync','上傳中…'); setCloudStatus('上傳中…');
+  Promise.all([
+    db.products.length ? sb.from(T.products).upsert(db.products) : Promise.resolve({}),
+    db.customers.length ? sb.from(T.customers).upsert(db.customers) : Promise.resolve({}),
+    db.sales.length ? sb.from(T.sales).upsert(db.sales) : Promise.resolve({})
+  ]).then(res=>{
+    const bad=res.find(r=>r && r.error);
+    if(bad) throw bad.error;
+    setSyncChip('ok','已同步'); setCloudStatus('已把本機資料上傳雲端。'); toast('已上傳到雲端');
+  }).catch(e=>{
+    console.error(e); setSyncChip('err','上傳失敗');
+    setCloudStatus('上傳失敗，請確認建表 SQL 已執行成功。'); toast('上傳失敗');
+  });
+}
+function sbDisconnect(){
   if(!confirm('中斷後本機仍可使用，但不再與雲端同步。確定？')) return;
-  cloudUrl=''; localStorage.removeItem(CLOUD_URL_KEY);
+  sbReady=false; sb=null; sbUrl=''; sbKey='';
+  localStorage.removeItem(SB_URL_KEY); localStorage.removeItem(SB_KEY_KEY);
   setSyncChip('local','本機'); setCloudStatus('已中斷連線（僅存本機）。'); toast('已中斷雲端連線');
 }
 
-const GS_CODE = `// 客戶銷貨系統 — Google 試算表後端（請整段貼到 Apps Script，存檔後部署為網頁應用程式）
-var TABLES = {
-  products:  ['id','code','name','spec','price'],
-  customers: ['id','name','phone','note'],
-  sales:     ['id','date','productId','code','product','spec','qty','price','total','customerId','customer','note']
-};
+const SQL_CODE = `-- 客戶銷貨系統 — Supabase 建表（到 SQL Editor 貼上整段，按 Run）
+create table if not exists sales_products (
+  id text primary key, code text, name text, spec text, price numeric default 0
+);
+create table if not exists sales_customers (
+  id text primary key, name text, phone text, note text
+);
+create table if not exists sales_records (
+  id text primary key, date text, product_id text, code text, product text, spec text,
+  qty numeric default 0, price numeric default 0, total numeric default 0,
+  customer_id text, customer text, note text
+);
 
-function doGet(e){ return out(readAll()); }
+alter table sales_products  enable row level security;
+alter table sales_customers enable row level security;
+alter table sales_records   enable row level security;
 
-function doPost(e){
-  var data = JSON.parse(e.postData.contents);
-  writeAll(data);
-  return out({ ok:true });
-}
+drop policy if exists "allow all" on sales_products;
+drop policy if exists "allow all" on sales_customers;
+drop policy if exists "allow all" on sales_records;
+create policy "allow all" on sales_products  for all using (true) with check (true);
+create policy "allow all" on sales_customers for all using (true) with check (true);
+create policy "allow all" on sales_records   for all using (true) with check (true);
 
-function readAll(){
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var result = {};
-  Object.keys(TABLES).forEach(function(name){
-    var cols = TABLES[name];
-    var sh = ss.getSheetByName(name);
-    var arr = [];
-    if(sh){
-      var values = sh.getDataRange().getValues();
-      for(var i=1;i<values.length;i++){
-        var row = values[i];
-        if(row.join('') === '') continue;
-        var obj = {};
-        for(var j=0;j<cols.length;j++){ obj[cols[j]] = row[j]; }
-        arr.push(obj);
-      }
-    }
-    result[name] = arr;
-  });
-  return result;
-}
-
-function writeAll(data){
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  Object.keys(TABLES).forEach(function(name){
-    var cols = TABLES[name];
-    var sh = ss.getSheetByName(name);
-    if(!sh){ sh = ss.insertSheet(name); }
-    sh.clearContents();
-    var rows = [cols];
-    var list = data[name] || [];
-    list.forEach(function(item){
-      rows.push(cols.map(function(c){ return item[c]==null ? '' : item[c]; }));
-    });
-    var range = sh.getRange(1,1,rows.length,cols.length);
-    range.setNumberFormat('@');
-    range.setValues(rows);
-  });
-}
-
-function out(obj){
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}`;
+alter publication supabase_realtime add table sales_products;
+alter publication supabase_realtime add table sales_customers;
+alter publication supabase_realtime add table sales_records;`;
 
 /* ===================== 初始化 ===================== */
 loadDB();
 resetSaleForm();
 refreshSaleSelects();
 renderRecent();
-if(cloudUrl){
+if(sbUrl && sbKey && sbInit()){
   setSyncChip('sync','載入中…');
-  fetch(cloudUrl,{method:'GET'}).then(r=>r.json()).then(data=>{
-    if(!data||!data.products) throw 0; applyCloud(data);
-  }).catch(()=>setSyncChip('err','離線（用本機）'));
+  sbFetchAll().then(()=>{ sbReady=true; sbSubscribe(); setSyncChip('ok','已同步'); })
+    .catch(()=>setSyncChip('err','離線（用本機）'));
 }else{
   setSyncChip('local','本機');
 }
