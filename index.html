@@ -106,6 +106,10 @@
           <select id="f_product" onchange="onProductPick()"></select>
         </div>
         <div>
+          <label>規格</label>
+          <input id="f_spec" readonly placeholder="(選品項後自動帶)">
+        </div>
+        <div>
           <label>品號</label>
           <input id="f_code" readonly placeholder="(選品項後自動帶)">
         </div>
@@ -141,7 +145,7 @@
       <h2>最近 10 筆</h2>
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>日期</th><th>品號</th><th>品項</th><th class="num">數量</th>
+          <th>日期</th><th>品號</th><th>品項</th><th>規格</th><th class="num">數量</th>
           <th class="num">單價</th><th class="num">總價</th><th>客戶</th><th>備註</th>
         </tr></thead>
         <tbody id="recentBody"></tbody>
@@ -157,6 +161,7 @@
         <div><label>起始日期</label><input type="date" id="q_from" onchange="renderList()"></div>
         <div><label>結束日期</label><input type="date" id="q_to" onchange="renderList()"></div>
         <div><label>品項</label><select id="q_product" onchange="renderList()"></select></div>
+        <div><label>規格</label><select id="q_spec" onchange="renderList()"></select></div>
         <div><label>品號</label><select id="q_code" onchange="renderList()"></select></div>
         <div><label>客戶名稱</label><select id="q_customer" onchange="renderList()"></select></div>
         <div><label>關鍵字(備註)</label><input id="q_kw" placeholder="搜尋備註" oninput="renderList()"></div>
@@ -171,6 +176,7 @@
           <option value="date">依日期</option>
           <option value="code">依品號</option>
           <option value="product">依品項</option>
+          <option value="spec">依規格</option>
           <option value="customer">依客戶名稱</option>
         </select>
         <button class="btn sm" onclick="exportStatsExcel()">📊 匯出統計 Excel</button>
@@ -189,7 +195,7 @@
       <h2>明細清單 (<span id="listCount">0</span> 筆)</h2>
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>日期</th><th>品號</th><th>品項</th><th class="num">數量</th>
+          <th>日期</th><th>品號</th><th>品項</th><th>規格</th><th class="num">數量</th>
           <th class="num">單價</th><th class="num">總價</th><th>客戶</th><th>備註</th><th>操作</th>
         </tr></thead>
         <tbody id="listBody"></tbody>
@@ -204,6 +210,7 @@
       <input type="hidden" id="prodEditId">
       <div class="grid">
         <div><label>品項名稱</label><input id="p_name" placeholder="例如 蘋果"></div>
+        <div><label>規格</label><input id="p_spec" placeholder="例如 大箱 / 12入 (可空白)"></div>
         <div><label>品號</label><input id="p_code" placeholder="例如 A001"></div>
         <div><label>預設單價</label><input type="number" id="p_price" min="0" step="0.01" placeholder="0"></div>
       </div>
@@ -216,7 +223,7 @@
     <div class="card">
       <h2>商品清單 (<span id="prodCount">0</span> 項)</h2>
       <div class="table-wrap"><table>
-        <thead><tr><th>品項名稱</th><th>品號</th><th class="num">預設單價</th><th>操作</th></tr></thead>
+        <thead><tr><th>品項名稱</th><th>規格</th><th>品號</th><th class="num">預設單價</th><th>操作</th></tr></thead>
         <tbody id="prodBody"></tbody>
       </table></div>
     </div>
@@ -300,7 +307,7 @@ function refreshSaleSelects(){
   const cs = document.getElementById('f_customer');
   const curP = ps.value, curC = cs.value;
   ps.innerHTML = '<option value="">-- 請選擇品項 --</option>' +
-    db.products.map(p=>`<option value="${p.id}">${esc(p.name)} (${esc(p.code)})</option>`).join('');
+    db.products.map(p=>`<option value="${p.id}">${esc(p.name)}${p.spec?' '+esc(p.spec):''} (${esc(p.code)})</option>`).join('');
   cs.innerHTML = '<option value="">-- 請選擇客戶 --</option>' +
     db.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   ps.value = curP; cs.value = curC;
@@ -308,6 +315,7 @@ function refreshSaleSelects(){
 function onProductPick(){
   const p = db.products.find(x=>x.id===document.getElementById('f_product').value);
   document.getElementById('f_code').value = p ? p.code : '';
+  document.getElementById('f_spec').value = p ? (p.spec||'') : '';
   if(p){ document.getElementById('f_price').value = (p.price!=null?p.price:''); }
   calcTotal();
 }
@@ -329,7 +337,7 @@ function saveSale(){
   const p = db.products.find(x=>x.id===prodId);
   const c = db.customers.find(x=>x.id===custId);
   const rec = {
-    date, productId:prodId, code:p.code, product:p.name,
+    date, productId:prodId, code:p.code, product:p.name, spec:(p.spec||''),
     qty, price, total:qty*price,
     customerId:custId, customer:c.name,
     note: document.getElementById('f_note').value.trim()
@@ -348,6 +356,7 @@ function resetSaleForm(){
   document.getElementById('f_date').value = todayStr();
   document.getElementById('f_product').value='';
   document.getElementById('f_code').value='';
+  document.getElementById('f_spec').value='';
   document.getElementById('f_qty').value=1;
   document.getElementById('f_price').value='';
   document.getElementById('f_total').value='';
@@ -363,6 +372,7 @@ function editSale(id){
   document.getElementById('f_date').value=s.date;
   document.getElementById('f_product').value=s.productId||'';
   document.getElementById('f_code').value=s.code;
+  document.getElementById('f_spec').value=s.spec||'';
   document.getElementById('f_qty').value=s.qty;
   document.getElementById('f_price').value=s.price;
   document.getElementById('f_customer').value=s.customerId||'';
@@ -381,10 +391,10 @@ function renderRecent(){
   const rows = [...db.sales].sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id)).slice(0,10);
   const tb = document.getElementById('recentBody');
   tb.innerHTML = rows.length ? rows.map(s=>`<tr>
-    <td>${esc(s.date)}</td><td>${esc(s.code)}</td><td>${esc(s.product)}</td>
+    <td>${esc(s.date)}</td><td>${esc(s.code)}</td><td>${esc(s.product)}</td><td>${esc(s.spec)}</td>
     <td class="num">${s.qty}</td><td class="num">${money(s.price)}</td>
     <td class="num">${money(s.total)}</td><td>${esc(s.customer)}</td><td>${esc(s.note)}</td>
-  </tr>`).join('') : '<tr><td colspan="8" class="empty">尚無銷貨資料</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">尚無銷貨資料</td></tr>';
 }
 
 /* ===================== 銷貨明細 / 統計 ===================== */
@@ -395,18 +405,20 @@ function refreshListFilters(){
     el.value=cur||'';
   };
   fill('q_product', [...new Set(db.products.map(p=>p.name))], document.getElementById('q_product').value);
+  fill('q_spec', [...new Set(db.products.map(p=>p.spec).filter(Boolean))], document.getElementById('q_spec').value);
   fill('q_code', [...new Set(db.products.map(p=>p.code))], document.getElementById('q_code').value);
   fill('q_customer', [...new Set(db.customers.map(c=>c.name))], document.getElementById('q_customer').value);
 }
 function clearFilters(){
   ['q_from','q_to','q_kw'].forEach(id=>document.getElementById(id).value='');
-  ['q_product','q_code','q_customer'].forEach(id=>document.getElementById(id).value='');
+  ['q_product','q_spec','q_code','q_customer'].forEach(id=>document.getElementById(id).value='');
   renderList();
 }
 function getFiltered(){
   const from=document.getElementById('q_from').value;
   const to=document.getElementById('q_to').value;
   const prod=document.getElementById('q_product').value;
+  const spec=document.getElementById('q_spec').value;
   const code=document.getElementById('q_code').value;
   const cust=document.getElementById('q_customer').value;
   const kw=document.getElementById('q_kw').value.trim().toLowerCase();
@@ -414,6 +426,7 @@ function getFiltered(){
     if(from && s.date<from) return false;
     if(to && s.date>to) return false;
     if(prod && s.product!==prod) return false;
+    if(spec && (s.spec||'')!==spec) return false;
     if(code && s.code!==code) return false;
     if(cust && s.customer!==cust) return false;
     if(kw && !String(s.note||'').toLowerCase().includes(kw)) return false;
@@ -426,14 +439,14 @@ function renderList(){
   document.getElementById('listCount').textContent=rows.length;
   const tb=document.getElementById('listBody');
   tb.innerHTML = rows.length ? rows.map(s=>`<tr>
-    <td>${esc(s.date)}</td><td>${esc(s.code)}</td><td>${esc(s.product)}</td>
+    <td>${esc(s.date)}</td><td>${esc(s.code)}</td><td>${esc(s.product)}</td><td>${esc(s.spec)}</td>
     <td class="num">${s.qty}</td><td class="num">${money(s.price)}</td>
     <td class="num">${money(s.total)}</td><td>${esc(s.customer)}</td><td>${esc(s.note)}</td>
     <td><div class="row-actions">
       <button class="btn sec sm" onclick="editSale('${s.id}')">編輯</button>
       <button class="btn danger sm" onclick="delSale('${s.id}')">刪除</button>
     </div></td>
-  </tr>`).join('') : '<tr><td colspan="9" class="empty">無符合資料</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="10" class="empty">無符合資料</td></tr>';
   renderStats();
 }
 function renderStats(){
@@ -448,7 +461,7 @@ function renderStats(){
   const wrap=document.getElementById('statTableWrap');
   if(!by){ wrap.style.display='none'; return; }
   wrap.style.display='block';
-  const keyName={date:'日期',code:'品號',product:'品項',customer:'客戶名稱'}[by];
+  const keyName={date:'日期',code:'品號',product:'品項',spec:'規格',customer:'客戶名稱'}[by];
   const map={};
   rows.forEach(s=>{
     const k=s[by]||'(空白)';
@@ -467,6 +480,7 @@ function renderStats(){
 function saveProduct(){
   const code=document.getElementById('p_code').value.trim();
   const name=document.getElementById('p_name').value.trim();
+  const spec=document.getElementById('p_spec').value.trim();
   const price=Number(document.getElementById('p_price').value)||0;
   if(!code) return toast('請輸入品號');
   if(!name) return toast('請輸入品項名稱');
@@ -474,10 +488,10 @@ function saveProduct(){
   if(db.products.some(p=>p.code===code && p.id!==editId)) return toast('品號重複');
   if(editId){
     const p=db.products.find(x=>x.id===editId);
-    p.code=code; p.name=name; p.price=price; toast('已更新商品');
+    p.code=code; p.name=name; p.spec=spec; p.price=price; toast('已更新商品');
   }else{
     if(db.products.length>=50) return toast('商品數量過多');
-    db.products.push({id:uid(),code,name,price}); toast('已新增商品');
+    db.products.push({id:uid(),code,name,spec,price}); toast('已新增商品');
   }
   saveDB(); resetProductForm(); renderProducts();
 }
@@ -485,6 +499,7 @@ function resetProductForm(){
   document.getElementById('prodEditId').value='';
   document.getElementById('p_code').value='';
   document.getElementById('p_name').value='';
+  document.getElementById('p_spec').value='';
   document.getElementById('p_price').value='';
   document.getElementById('prodFormTitle').textContent='新增商品';
   document.getElementById('prodCancelBtn').style.display='none';
@@ -494,6 +509,7 @@ function editProduct(id){
   document.getElementById('prodEditId').value=p.id;
   document.getElementById('p_code').value=p.code;
   document.getElementById('p_name').value=p.name;
+  document.getElementById('p_spec').value=p.spec||'';
   document.getElementById('p_price').value=p.price;
   document.getElementById('prodFormTitle').textContent='編輯商品';
   document.getElementById('prodCancelBtn').style.display='inline-block';
@@ -510,11 +526,11 @@ function renderProducts(){
   document.getElementById('prodCount').textContent=db.products.length;
   const tb=document.getElementById('prodBody');
   tb.innerHTML = db.products.length ? db.products.map(p=>`<tr>
-    <td>${esc(p.name)}</td><td><span class="pill">${esc(p.code)}</span></td><td class="num">${money(p.price)}</td>
+    <td>${esc(p.name)}</td><td>${esc(p.spec)}</td><td><span class="pill">${esc(p.code)}</span></td><td class="num">${money(p.price)}</td>
     <td><div class="row-actions">
       <button class="btn sec sm" onclick="editProduct('${p.id}')">編輯</button>
       <button class="btn danger sm" onclick="delProduct('${p.id}')">刪除</button>
-    </div></td></tr>`).join('') : '<tr><td colspan="4" class="empty">尚無商品,請先新增</td></tr>';
+    </div></td></tr>`).join('') : '<tr><td colspan="5" class="empty">尚無商品,請先新增</td></tr>';
 }
 
 /* ===================== 客戶管理 ===================== */
@@ -573,11 +589,11 @@ function exportDetailExcel(){
   const rows=getFiltered();
   if(!rows.length) return toast('無資料可匯出');
   const data=rows.map(s=>({
-    '日期':s.date,'品號':s.code,'品項':s.product,'數量':s.qty,
+    '日期':s.date,'品號':s.code,'品項':s.product,'規格':s.spec||'','數量':s.qty,
     '單價':s.price,'總價':s.total,'客戶名稱':s.customer,'備註':s.note||''
   }));
   const ws=XLSX.utils.json_to_sheet(data);
-  ws['!cols']=[{wch:12},{wch:10},{wch:16},{wch:8},{wch:10},{wch:12},{wch:16},{wch:24}];
+  ws['!cols']=[{wch:12},{wch:10},{wch:16},{wch:12},{wch:8},{wch:10},{wch:12},{wch:16},{wch:24}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'銷貨明細');
   XLSX.writeFile(wb,`銷貨明細_${todayStr()}.xlsx`);
@@ -588,7 +604,7 @@ function exportStatsExcel(){
   if(!rows.length) return toast('無資料可匯出');
   const by=document.getElementById('q_groupby').value;
   if(!by) return toast('請先選擇統計維度');
-  const keyName={date:'日期',code:'品號',product:'品項',customer:'客戶名稱'}[by];
+  const keyName={date:'日期',code:'品號',product:'品項',spec:'規格',customer:'客戶名稱'}[by];
   const map={};
   rows.forEach(s=>{
     const k=s[by]||'(空白)';
