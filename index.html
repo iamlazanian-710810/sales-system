@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客戶銷貨系統</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2563eb">
+<link rel="apple-touch-icon" href="icon-180.png">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -19,7 +22,7 @@
   header{background:var(--brand);color:#fff;padding:14px 20px;display:flex;
     align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
   header h1{margin:0;font-size:19px;font-weight:700}
-  header .tools{display:flex;gap:8px;flex-wrap:wrap}
+  header .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   nav{background:var(--card);border-bottom:1px solid var(--line);padding:0 12px;
     display:flex;gap:2px;overflow-x:auto}
   nav button{background:none;border:none;padding:14px 18px;cursor:pointer;
@@ -31,6 +34,7 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
     padding:18px;margin-bottom:18px;box-shadow:var(--shadow)}
   .card h2{margin:0 0 14px;font-size:17px}
+  .card h3{font-size:14px;margin:0 0 8px;color:var(--muted)}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
   label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
   input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);
@@ -58,10 +62,20 @@
   .filters > div{flex:1;min-width:140px}
   .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
   .stat{background:var(--okbg);border:1px solid #d1fae5;border-radius:10px;padding:14px}
-  .stat .v{font-size:24px;font-weight:800;color:var(--ok)}
+  .stat .v{font-size:22px;font-weight:800;color:var(--ok)}
   .stat .l{font-size:13px;color:var(--muted)}
+  .stat.warn{background:var(--warnbg);border-color:#fecaca}
+  .stat.warn .v{color:var(--warn)}
+  .stat.pend{background:#fffbeb;border-color:#fde68a}
+  .stat.pend .v{color:#b45309}
+  .stat.info{background:#eff6ff;border-color:#bfdbfe}
+  .stat.info .v{color:var(--brand)}
   .pill{display:inline-block;background:#eff6ff;color:var(--brand);border-radius:99px;
     padding:2px 10px;font-size:12px;font-weight:600}
+  .pay{border:none;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer}
+  .pay-unpaid{background:#fee2e2;color:#b91c1c}
+  .pay-paid{background:#d1fae5;color:#047857}
+  .pay-pending{background:#fef3c7;color:#b45309}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
     background:#111827;color:#fff;padding:11px 20px;border-radius:10px;font-size:14px;
     opacity:0;pointer-events:none;transition:.25s;z-index:99}
@@ -76,10 +90,22 @@
   .step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;
     display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
   .step .t{flex:1;padding-top:2px}
-  .total-line{font-size:20px;font-weight:800;color:var(--brand)}
-  @media(max-width:600px){
+  .banner{background:#fffbeb;border-bottom:1px solid #fde68a;padding:9px 16px;font-size:14px;
+    display:none;align-items:center;gap:10px;flex-wrap:wrap}
+  .rpt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .ver{text-align:center;font-size:12px;color:var(--muted);margin:6px 0 20px}
+  @media(max-width:700px){
     header h1{font-size:16px}
     th,td{padding:7px 8px}
+    .cardable thead{display:none}
+    .cardable,.cardable tbody,.cardable tr,.cardable td{display:block;width:100%}
+    .cardable tr{border:1px solid var(--line);border-radius:10px;margin:8px;padding:6px 10px;background:#fff}
+    .cardable td{display:flex;justify-content:space-between;align-items:center;gap:10px;
+      border-bottom:none;padding:4px 0;white-space:normal;text-align:right}
+    .cardable td::before{content:attr(data-label);color:var(--muted);flex:none;text-align:left;font-size:12px}
+    .cardable td.empty{display:block;text-align:center}
+    .cardable td.empty::before{content:none}
+    .cardable .row-actions{justify-content:flex-end}
   }
 </style>
 </head>
@@ -94,9 +120,16 @@
   </div>
 </header>
 
+<div class="banner" id="backupBanner">
+  <span>💾 已超過 7 天沒備份了，建議現在下載一份備份檔保存。</span>
+  <button class="btn sm" onclick="backupData()">立即備份</button>
+  <button class="btn sec sm" onclick="snoozeBackup()">明天再說</button>
+</div>
+
 <nav>
   <button class="active" data-tab="sale" onclick="switchTab('sale')">📝 銷貨登錄</button>
   <button data-tab="list" onclick="switchTab('list')">🗂 銷貨明細 / 統計</button>
+  <button data-tab="report" onclick="switchTab('report')">📈 報表</button>
   <button data-tab="product" onclick="switchTab('product')">📦 商品管理</button>
   <button data-tab="customer" onclick="switchTab('customer')">👥 客戶管理</button>
   <button data-tab="cloud" onclick="switchTab('cloud')">☁️ 雲端同步</button>
@@ -114,8 +147,9 @@
           <input type="date" id="f_date">
         </div>
         <div>
-          <label>品項</label>
-          <select id="f_product" onchange="onProductPick()"></select>
+          <label>品項(可直接打字搜尋)</label>
+          <input id="f_product" list="productOptions" placeholder="輸入或點選品項" oninput="onProductPick()" autocomplete="off">
+          <datalist id="productOptions"></datalist>
         </div>
         <div>
           <label>規格</label>
@@ -141,6 +175,14 @@
           <label>客戶名稱</label>
           <select id="f_customer"></select>
         </div>
+        <div>
+          <label>收款狀態</label>
+          <select id="f_pay">
+            <option value="unpaid">未收款</option>
+            <option value="paid">已收款</option>
+            <option value="pending">待確認</option>
+          </select>
+        </div>
         <div style="grid-column:1/-1">
           <label>備註</label>
           <textarea id="f_note" placeholder="選填"></textarea>
@@ -150,15 +192,15 @@
         <button class="btn ok" onclick="saveSale()">✓ 儲存銷貨單</button>
         <button class="btn sec" id="saleCancelBtn" style="display:none" onclick="resetSaleForm()">取消編輯</button>
       </div>
-      <p class="hint" id="saleHint"></p>
+      <p class="hint">儲存後會保留「日期」和「客戶」，方便連續開單。</p>
     </div>
 
     <div class="card">
       <h2>最近 10 筆</h2>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="cardable">
         <thead><tr>
           <th>日期</th><th>品號</th><th>品項</th><th>規格</th><th class="num">數量</th>
-          <th class="num">單價</th><th class="num">總價</th><th>客戶</th><th>備註</th>
+          <th class="num">單價</th><th class="num">總價</th><th>客戶</th><th>收款</th><th>備註</th>
         </tr></thead>
         <tbody id="recentBody"></tbody>
       </table></div>
@@ -176,13 +218,22 @@
         <div><label>規格</label><select id="q_spec" onchange="renderList()"></select></div>
         <div><label>品號</label><select id="q_code" onchange="renderList()"></select></div>
         <div><label>客戶名稱</label><select id="q_customer" onchange="renderList()"></select></div>
+        <div><label>收款狀態</label>
+          <select id="q_pay" onchange="renderList()">
+            <option value="">全部</option>
+            <option value="unpaid">未收款</option>
+            <option value="paid">已收款</option>
+            <option value="pending">待確認</option>
+          </select>
+        </div>
         <div><label>關鍵字(備註)</label><input id="q_kw" placeholder="搜尋備註" oninput="renderList()"></div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="btn sec sm" onclick="clearFilters()">清除篩選</button>
         <button class="btn ok sm" onclick="exportDetailExcel()">📊 匯出明細 Excel</button>
+        <button class="btn sec sm" onclick="toggleTrash()">🗑 回收桶(<span id="trashCount">0</span>)</button>
         <span style="flex:1"></span>
-        <label style="margin:0;align-self:center">統計維度:</label>
+        <label style="margin:0;align-self:center">統計:</label>
         <select id="q_groupby" style="width:auto" onchange="renderStats()">
           <option value="">不分組(總計)</option>
           <option value="date">依日期</option>
@@ -190,6 +241,15 @@
           <option value="product">依品項</option>
           <option value="spec">依規格</option>
           <option value="customer">依客戶名稱</option>
+        </select>
+        <label style="margin:0;align-self:center">再細分:</label>
+        <select id="q_groupby2" style="width:auto" onchange="renderStats()">
+          <option value="">無</option>
+          <option value="date">日期</option>
+          <option value="code">品號</option>
+          <option value="product">品項</option>
+          <option value="spec">規格</option>
+          <option value="customer">客戶名稱</option>
         </select>
         <button class="btn sm" onclick="exportStatsExcel()">📊 匯出統計 Excel</button>
       </div>
@@ -203,15 +263,70 @@
       </table></div>
     </div>
 
+    <div class="card" id="trashCard" style="display:none">
+      <h2>🗑 回收桶 <span class="hint" style="display:inline">（刪除的銷貨單保留 30 天，可還原）</span></h2>
+      <div class="table-wrap"><table class="cardable">
+        <thead><tr><th>刪除日</th><th>銷貨日期</th><th>品項</th><th>客戶</th><th class="num">總價</th><th>操作</th></tr></thead>
+        <tbody id="trashBody"></tbody>
+      </table></div>
+    </div>
+
     <div class="card">
       <h2>明細清單 (<span id="listCount">0</span> 筆)</h2>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="cardable">
         <thead><tr>
           <th>日期</th><th>品號</th><th>品項</th><th>規格</th><th class="num">數量</th>
-          <th class="num">單價</th><th class="num">總價</th><th>客戶</th><th>備註</th><th>操作</th>
+          <th class="num">單價</th><th class="num">總價</th><th>客戶</th><th>收款</th><th>備註</th><th>操作</th>
         </tr></thead>
         <tbody id="listBody"></tbody>
       </table></div>
+    </div>
+  </section>
+
+  <!-- ========== 報表 ========== -->
+  <section id="tab-report" class="tab">
+    <div class="card">
+      <h2>📈 報表總覽</h2>
+      <div class="stat-cards" id="rptCards"></div>
+    </div>
+    <div class="card">
+      <h2>近 12 個月營收</h2>
+      <div id="rptChart" style="overflow-x:auto"></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">排行榜</h2>
+        <select id="rpt_period" style="width:auto" onchange="renderReport()">
+          <option value="m0">本月</option>
+          <option value="m3">近 3 個月</option>
+          <option value="m12" selected>近 12 個月</option>
+          <option value="all">全部</option>
+        </select>
+      </div>
+      <div class="rpt-grid">
+        <div>
+          <h3>客戶排行（金額）</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>客戶</th><th class="num">筆數</th><th class="num">金額</th></tr></thead>
+            <tbody id="rptCustBody"></tbody>
+          </table></div>
+        </div>
+        <div>
+          <h3>品項排行（金額）</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>品項</th><th class="num">數量</th><th class="num">金額</th></tr></thead>
+            <tbody id="rptProdBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>💰 未收款總覽（依客戶）</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>客戶</th><th class="num">筆數</th><th class="num">未收金額</th></tr></thead>
+        <tbody id="rptUnpaidBody"></tbody>
+      </table></div>
+      <p class="hint">只列「未收款」；「待確認」的舊資料請到明細清單用收款狀態篩選逐筆確認。</p>
     </div>
   </section>
 
@@ -230,7 +345,7 @@
         <button class="btn ok" onclick="saveProduct()">✓ 儲存</button>
         <button class="btn sec" id="prodCancelBtn" style="display:none" onclick="resetProductForm()">取消編輯</button>
       </div>
-      <p class="hint">提示:品項上限約 20 個。品號不可重複。</p>
+      <p class="hint">品項上限 50 個。品號不可重複。</p>
     </div>
     <div class="card">
       <h2>商品清單 (<span id="prodCount">0</span> 項)</h2>
@@ -283,27 +398,26 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn ok" onclick="sbConnect()">🔗 儲存並連線</button>
         <button class="btn sec" onclick="sbReload()">🔄 重新載入</button>
-        <button class="btn sec" onclick="sbUploadLocal()">⬆️ 把本機資料上傳雲端</button>
+        <button class="btn sec" onclick="sbUploadLocal()">⬆️ 把本機資料合併上傳</button>
         <button class="btn danger" onclick="sbDisconnect()">中斷連線</button>
       </div>
       <p class="hint" id="cloudStatus">目前狀態：未連線（僅存本機）。</p>
       <p class="hint">⚠️ 第一次設定：先在「資料最完整的那台」連線後按
-        <b>⬆️ 把本機資料上傳雲端</b>，其他裝置連線後資料就會自動出現。</p>
+        <b>⬆️ 把本機資料合併上傳</b>，其他裝置連線後資料就會自動出現。</p>
+      <p class="hint" id="cloudVer"></p>
     </div>
 
     <div class="card">
       <h2>📋 第一次設定步驟（只需做一次）</h2>
       <div class="step"><div class="n">1</div><div class="t">
         登入 <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">supabase.com</a>，
-        打開你的專案（就是 lunch-order 那個）。</div></div>
+        打開你的專案。</div></div>
       <div class="step"><div class="n">2</div><div class="t">
-        左側點 <b>SQL Editor → New query</b>，把下面整段 SQL 貼上（按「複製 SQL」），按 <b>Run</b>。
-        看到成功訊息即建好資料表。</div></div>
+        左側點 <b>SQL Editor → New query</b>，把下面整段 SQL 貼上（按「複製 SQL」），按 <b>Run</b>。</div></div>
       <div class="step"><div class="n">3</div><div class="t">
-        回本頁上方，把 <b>連線網址</b> 與 <b>金鑰</b> 貼進去（我會把值給你），按
-        <b>🔗 儲存並連線</b>。</div></div>
+        回本頁上方，貼 <b>連線網址</b> 與 <b>金鑰</b>，按 <b>🔗 儲存並連線</b>。</div></div>
       <div class="step"><div class="n">4</div><div class="t">
-        在資料最完整的裝置按 <b>⬆️ 把本機資料上傳雲端</b>。其他手機/電腦貼一樣的網址金鑰連線即可。完成！</div></div>
+        在資料最完整的裝置按 <b>⬆️ 把本機資料合併上傳</b>。其他裝置連線即可。完成！</div></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
         <b>建表 SQL</b>
         <button class="btn sm" onclick="copySQL()">📋 複製 SQL</button>
@@ -311,21 +425,40 @@
       <div class="codebox" id="sqlCode"></div>
     </div>
   </section>
+
+  <p class="ver" id="verLine"></p>
 </main>
 
 <div class="toast" id="toast"></div>
 
 <script>
-/* ===================== 資料層 (LocalStorage) ===================== */
+/* ===================== 常數與狀態 ===================== */
+const APP_VERSION = "2.0.0";
 const DB_KEY = "sales_system_v1";
 const SB_URL_KEY = "sales_sb_url";
 const SB_KEY_KEY = "sales_sb_key";
+const OPS_KEY = "sales_pending_ops";
+const BACKUP_TS_KEY = "sales_last_backup";
+const BACKUP_SNOOZE_KEY = "sales_backup_snooze";
+const PAY_LABEL = { unpaid:"未收款", paid:"已收款", pending:"待確認" };
+const KEY_NAME = { date:"日期", code:"品號", product:"品項", spec:"規格", customer:"客戶名稱" };
+const T = { products:"sales_products", customers:"sales_customers", sales:"sales_records" };
+
 let db = { products:[], customers:[], sales:[] };
 let sbUrl = localStorage.getItem(SB_URL_KEY) || "";
 let sbKey = localStorage.getItem(SB_KEY_KEY) || "";
-let sb = null, sbReady = false, sbRefetchTimer = null;
-const T = { products:'sales_products', customers:'sales_customers', sales:'sales_records' };
+let sb = null, sbReady = false, sbRefetchTimer = null, flushing = false;
 
+/* ===================== 資料層 ===================== */
+function migrateSales(arr){
+  (arr||[]).forEach(s=>{
+    if(s.productId!==undefined && s.product_id===undefined){ s.product_id=s.productId; delete s.productId; }
+    if(s.customerId!==undefined && s.customer_id===undefined){ s.customer_id=s.customerId; delete s.customerId; }
+    if(!s.pay_status) s.pay_status = "pending";
+    if(s.deleted===undefined || s.deleted===null) s.deleted = false;
+    if(s.deleted_at===undefined || s.deleted_at===null) s.deleted_at = "";
+  });
+}
 function loadDB(){
   try{
     const raw = localStorage.getItem(DB_KEY);
@@ -334,11 +467,7 @@ function loadDB(){
   db.products = db.products || [];
   db.customers = db.customers || [];
   db.sales = db.sales || [];
-  // 相容舊資料：camelCase 欄位 → snake_case（配合 Supabase 欄位）
-  db.sales.forEach(s=>{
-    if(s.productId!==undefined && s.product_id===undefined){ s.product_id=s.productId; delete s.productId; }
-    if(s.customerId!==undefined && s.customer_id===undefined){ s.customer_id=s.customerId; delete s.customerId; }
-  });
+  migrateSales(db.sales);
 }
 function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -353,11 +482,22 @@ function money(n){
   n = Number(n)||0;
   return n.toLocaleString('zh-Hant',{minimumFractionDigits:0,maximumFractionDigits:2});
 }
+function shortMoney(n){
+  n = Number(n)||0;
+  if(n>=100000) return Math.round(n/10000)+'萬';
+  if(n>=10000) return (n/10000).toFixed(1)+'萬';
+  return money(n);
+}
 function todayStr(){
   const d = new Date(); const p = x=>String(x).padStart(2,'0');
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function payBadge(s){
+  const st = s.pay_status || 'pending';
+  return `<button class="pay pay-${st}" onclick="togglePay('${s.id}')" title="點一下切換收款狀態">${PAY_LABEL[st]||st}</button>`;
+}
+function activeSales(){ return db.sales.filter(s=>!s.deleted); }
 
 /* ===================== 分頁切換 ===================== */
 function switchTab(name){
@@ -365,25 +505,45 @@ function switchTab(name){
   document.querySelectorAll('.tab').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(name==='sale'){ refreshSaleSelects(); renderRecent(); }
-  if(name==='list'){ refreshListFilters(); renderList(); }
+  if(name==='list'){ renderList(); }
+  if(name==='report') renderReport();
   if(name==='product') renderProducts();
   if(name==='customer') renderCustomers();
   if(name==='cloud') renderCloud();
 }
 
-/* ===================== 銷貨登錄 ===================== */
-function refreshSaleSelects(){
-  const ps = document.getElementById('f_product');
-  const cs = document.getElementById('f_customer');
-  const curP = ps.value, curC = cs.value;
-  ps.innerHTML = '<option value="">-- 請選擇品項 --</option>' +
-    db.products.map(p=>`<option value="${p.id}">${esc(p.name)}${p.spec?' '+esc(p.spec):''} (${esc(p.code)})</option>`).join('');
-  cs.innerHTML = '<option value="">-- 請選擇客戶 --</option>' +
-    db.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  ps.value = curP; cs.value = curC;
+/* ===================== 品項/客戶 下拉資料 ===================== */
+function productLabel(p){ return p.name + (p.spec ? ' ' + p.spec : '') + ' (' + p.code + ')'; }
+function usageCount(field){
+  const map = {};
+  activeSales().forEach(s=>{ const k=s[field]; if(k) map[k]=(map[k]||0)+1; });
+  return map;
 }
+function sortedProducts(){
+  const use = usageCount('product_id');
+  return [...db.products].sort((a,b)=>(use[b.id]||0)-(use[a.id]||0) || String(a.name).localeCompare(b.name,'zh-Hant'));
+}
+function sortedCustomers(){
+  const use = usageCount('customer_id');
+  return [...db.customers].sort((a,b)=>(use[b.id]||0)-(use[a.id]||0) || String(a.name).localeCompare(b.name,'zh-Hant'));
+}
+function findProductByLabel(v){
+  v = String(v||'').trim();
+  return db.products.find(p=>productLabel(p)===v) || null;
+}
+function refreshSaleSelects(){
+  const dl = document.getElementById('productOptions');
+  dl.innerHTML = sortedProducts().map(p=>`<option value="${esc(productLabel(p))}"></option>`).join('');
+  const cs = document.getElementById('f_customer');
+  const curC = cs.value;
+  cs.innerHTML = '<option value="">-- 請選擇客戶 --</option>' +
+    sortedCustomers().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  cs.value = curC;
+}
+
+/* ===================== 銷貨登錄 ===================== */
 function onProductPick(){
-  const p = db.products.find(x=>x.id===document.getElementById('f_product').value);
+  const p = findProductByLabel(document.getElementById('f_product').value);
   document.getElementById('f_code').value = p ? p.code : '';
   document.getElementById('f_spec').value = p ? (p.spec||'') : '';
   if(p){ document.getElementById('f_price').value = (p.price!=null?p.price:''); }
@@ -395,31 +555,56 @@ function calcTotal(){
   document.getElementById('f_total').value = money(q*pr);
 }
 function saveSale(){
-  const prodId = document.getElementById('f_product').value;
+  const editId = document.getElementById('saleEditId').value;
+  const label = document.getElementById('f_product').value.trim();
+  const p = findProductByLabel(label);
+  let prodFields = null;
+  if(p){
+    prodFields = { product_id:p.id, code:p.code, product:p.name, spec:(p.spec||'') };
+  }else if(editId){
+    // 商品已被刪除的舊紀錄:品項欄沒動過時,沿用原紀錄的商品資訊,仍可改數量/價格/備註
+    const orig = db.sales.find(s=>s.id===editId);
+    const origLabel = orig ? (orig.product + (orig.spec?' '+orig.spec:'') + ' (' + orig.code + ')') : '';
+    if(orig && label===origLabel){
+      prodFields = { product_id:orig.product_id, code:orig.code, product:orig.product, spec:(orig.spec||'') };
+    }
+  }
   const custId = document.getElementById('f_customer').value;
   const date = document.getElementById('f_date').value;
   const qty = Number(document.getElementById('f_qty').value)||0;
   const price = Number(document.getElementById('f_price').value)||0;
   if(!date) return toast('請選擇日期');
-  if(!prodId) return toast('請選擇品項');
+  if(!prodFields) return toast('請從清單點選品項');
   if(!custId) return toast('請選擇客戶');
   if(qty<=0) return toast('數量需大於 0');
-  const p = db.products.find(x=>x.id===prodId);
   const c = db.customers.find(x=>x.id===custId);
   const rec = {
-    date, product_id:prodId, code:p.code, product:p.name, spec:(p.spec||''),
+    date, ...prodFields,
     qty, price, total:qty*price,
     customer_id:custId, customer:c.name,
+    pay_status: document.getElementById('f_pay').value || 'unpaid',
+    deleted:false, deleted_at:'',
     note: document.getElementById('f_note').value.trim()
   };
-  const editId = document.getElementById('saleEditId').value;
   if(editId){
     const i = db.sales.findIndex(s=>s.id===editId);
     rec.id = editId; db.sales[i] = rec; toast('已更新銷貨單');
+    saveDB(); supaUpsert(T.sales, rec); resetSaleForm();
   }else{
     rec.id = uid(); db.sales.push(rec); toast('已新增銷貨單');
+    saveDB(); supaUpsert(T.sales, rec);
+    // 連續開單：保留日期與客戶，其餘清空
+    document.getElementById('f_product').value='';
+    document.getElementById('f_code').value='';
+    document.getElementById('f_spec').value='';
+    document.getElementById('f_qty').value=1;
+    document.getElementById('f_price').value='';
+    document.getElementById('f_total').value='';
+    document.getElementById('f_pay').value='unpaid';
+    document.getElementById('f_note').value='';
+    refreshSaleSelects();
   }
-  saveDB(); supaUpsert(T.sales, rec); resetSaleForm(); renderRecent();
+  renderRecent();
 }
 function resetSaleForm(){
   document.getElementById('saleEditId').value='';
@@ -431,6 +616,7 @@ function resetSaleForm(){
   document.getElementById('f_price').value='';
   document.getElementById('f_total').value='';
   document.getElementById('f_customer').value='';
+  document.getElementById('f_pay').value='unpaid';
   document.getElementById('f_note').value='';
   document.getElementById('saleFormTitle').textContent='新增銷貨單';
   document.getElementById('saleCancelBtn').style.display='none';
@@ -440,12 +626,15 @@ function editSale(id){
   switchTab('sale');
   document.getElementById('saleEditId').value=s.id;
   document.getElementById('f_date').value=s.date;
-  document.getElementById('f_product').value=s.product_id||'';
+  const p = db.products.find(x=>x.id===s.product_id);
+  document.getElementById('f_product').value = p ? productLabel(p)
+    : (s.product + (s.spec?' '+s.spec:'') + ' (' + s.code + ')');
   document.getElementById('f_code').value=s.code;
   document.getElementById('f_spec').value=s.spec||'';
   document.getElementById('f_qty').value=s.qty;
   document.getElementById('f_price').value=s.price;
   document.getElementById('f_customer').value=s.customer_id||'';
+  document.getElementById('f_pay').value=s.pay_status||'pending';
   document.getElementById('f_note').value=s.note||'';
   calcTotal();
   document.getElementById('saleFormTitle').textContent='編輯銷貨單';
@@ -453,18 +642,78 @@ function editSale(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function delSale(id){
-  if(!confirm('確定刪除這筆銷貨單?')) return;
-  db.sales = db.sales.filter(s=>s.id!==id); saveDB(); supaDelete(T.sales, id);
-  renderRecent(); renderList(); toast('已刪除');
+  const s = db.sales.find(x=>x.id===id); if(!s) return;
+  if(!confirm('刪除這筆銷貨單？（會先放進回收桶，30 天內可還原）')) return;
+  s.deleted = true; s.deleted_at = todayStr();
+  saveDB(); supaUpsert(T.sales, s);
+  renderRecent(); renderList(); toast('已移到回收桶');
+}
+function togglePay(id){
+  const s = db.sales.find(x=>x.id===id); if(!s) return;
+  const cur = s.pay_status || 'pending';
+  s.pay_status = (cur==='unpaid') ? 'paid' : (cur==='paid' ? 'unpaid' : 'paid');
+  saveDB(); supaUpsert(T.sales, s);
+  renderRecent();
+  if(document.getElementById('tab-list').classList.contains('active')) renderList();
+  toast('已改為「'+PAY_LABEL[s.pay_status]+'」');
 }
 function renderRecent(){
-  const rows = [...db.sales].sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id)).slice(0,10);
+  const rows = activeSales().sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id)).slice(0,10);
   const tb = document.getElementById('recentBody');
   tb.innerHTML = rows.length ? rows.map(s=>`<tr>
-    <td>${esc(s.date)}</td><td>${esc(s.code)}</td><td>${esc(s.product)}</td><td>${esc(s.spec)}</td>
-    <td class="num">${s.qty}</td><td class="num">${money(s.price)}</td>
-    <td class="num">${money(s.total)}</td><td>${esc(s.customer)}</td><td>${esc(s.note)}</td>
-  </tr>`).join('') : '<tr><td colspan="9" class="empty">尚無銷貨資料</td></tr>';
+    <td data-label="日期">${esc(s.date)}</td><td data-label="品號">${esc(s.code)}</td>
+    <td data-label="品項">${esc(s.product)}</td><td data-label="規格">${esc(s.spec)}</td>
+    <td class="num" data-label="數量">${s.qty}</td><td class="num" data-label="單價">${money(s.price)}</td>
+    <td class="num" data-label="總價">${money(s.total)}</td><td data-label="客戶">${esc(s.customer)}</td>
+    <td data-label="收款">${payBadge(s)}</td><td data-label="備註">${esc(s.note)}</td>
+  </tr>`).join('') : '<tr><td colspan="10" class="empty">尚無銷貨資料</td></tr>';
+}
+
+/* ===================== 回收桶 ===================== */
+function trashSales(){ return db.sales.filter(s=>s.deleted); }
+function toggleTrash(){
+  const el = document.getElementById('trashCard');
+  const show = el.style.display==='none';
+  el.style.display = show ? 'block' : 'none';
+  if(show) renderTrash();
+}
+function renderTrash(){
+  const rows = trashSales().sort((a,b)=>String(b.deleted_at).localeCompare(String(a.deleted_at)));
+  document.getElementById('trashCount').textContent = rows.length;
+  const tb = document.getElementById('trashBody');
+  tb.innerHTML = rows.length ? rows.map(s=>`<tr>
+    <td data-label="刪除日">${esc(s.deleted_at)}</td><td data-label="銷貨日期">${esc(s.date)}</td>
+    <td data-label="品項">${esc(s.product)}${s.spec?' '+esc(s.spec):''}</td>
+    <td data-label="客戶">${esc(s.customer)}</td><td class="num" data-label="總價">${money(s.total)}</td>
+    <td><div class="row-actions">
+      <button class="btn sec sm" onclick="restoreSale('${s.id}')">還原</button>
+      <button class="btn danger sm" onclick="purgeSale('${s.id}')">永久刪除</button>
+    </div></td>
+  </tr>`).join('') : '<tr><td colspan="6" class="empty">回收桶是空的</td></tr>';
+}
+function restoreSale(id){
+  const s = db.sales.find(x=>x.id===id); if(!s) return;
+  s.deleted = false; s.deleted_at = '';
+  saveDB(); supaUpsert(T.sales, s);
+  renderTrash(); renderList(); renderRecent(); toast('已還原');
+}
+function purgeSale(id){
+  if(!confirm('永久刪除這筆？此動作無法復原！')) return;
+  db.sales = db.sales.filter(x=>x.id!==id);
+  saveDB(); supaDelete(T.sales, id);
+  renderTrash(); renderList(); toast('已永久刪除');
+}
+function purgeOldTrash(){
+  const cutoff = Date.now() - 30*86400000;
+  const old = trashSales().filter(s=>{
+    const t = Date.parse(s.deleted_at||'');
+    return !isNaN(t) && t < cutoff;
+  });
+  if(!old.length) return;
+  old.forEach(s=>{ supaDelete(T.sales, s.id); });
+  const ids = new Set(old.map(s=>s.id));
+  db.sales = db.sales.filter(s=>!ids.has(s.id));
+  saveDB();
 }
 
 /* ===================== 銷貨明細 / 統計 ===================== */
@@ -481,7 +730,7 @@ function refreshListFilters(){
 }
 function clearFilters(){
   ['q_from','q_to','q_kw'].forEach(id=>document.getElementById(id).value='');
-  ['q_product','q_spec','q_code','q_customer'].forEach(id=>document.getElementById(id).value='');
+  ['q_product','q_spec','q_code','q_customer','q_pay'].forEach(id=>document.getElementById(id).value='');
   renderList();
 }
 function getFiltered(){
@@ -491,14 +740,16 @@ function getFiltered(){
   const spec=document.getElementById('q_spec').value;
   const code=document.getElementById('q_code').value;
   const cust=document.getElementById('q_customer').value;
+  const pay=document.getElementById('q_pay').value;
   const kw=document.getElementById('q_kw').value.trim().toLowerCase();
-  return db.sales.filter(s=>{
+  return activeSales().filter(s=>{
     if(from && s.date<from) return false;
     if(to && s.date>to) return false;
     if(prod && s.product!==prod) return false;
     if(spec && (s.spec||'')!==spec) return false;
     if(code && s.code!==code) return false;
     if(cust && s.customer!==cust) return false;
+    if(pay && (s.pay_status||'pending')!==pay) return false;
     if(kw && !String(s.note||'').toLowerCase().includes(kw)) return false;
     return true;
   }).sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id));
@@ -507,43 +758,150 @@ function renderList(){
   refreshListFilters();
   const rows=getFiltered();
   document.getElementById('listCount').textContent=rows.length;
+  document.getElementById('trashCount').textContent=trashSales().length;
   const tb=document.getElementById('listBody');
   tb.innerHTML = rows.length ? rows.map(s=>`<tr>
-    <td>${esc(s.date)}</td><td>${esc(s.code)}</td><td>${esc(s.product)}</td><td>${esc(s.spec)}</td>
-    <td class="num">${s.qty}</td><td class="num">${money(s.price)}</td>
-    <td class="num">${money(s.total)}</td><td>${esc(s.customer)}</td><td>${esc(s.note)}</td>
+    <td data-label="日期">${esc(s.date)}</td><td data-label="品號">${esc(s.code)}</td>
+    <td data-label="品項">${esc(s.product)}</td><td data-label="規格">${esc(s.spec)}</td>
+    <td class="num" data-label="數量">${s.qty}</td><td class="num" data-label="單價">${money(s.price)}</td>
+    <td class="num" data-label="總價">${money(s.total)}</td><td data-label="客戶">${esc(s.customer)}</td>
+    <td data-label="收款">${payBadge(s)}</td><td data-label="備註">${esc(s.note)}</td>
     <td><div class="row-actions">
       <button class="btn sec sm" onclick="editSale('${s.id}')">編輯</button>
       <button class="btn danger sm" onclick="delSale('${s.id}')">刪除</button>
     </div></td>
-  </tr>`).join('') : '<tr><td colspan="10" class="empty">無符合資料</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="11" class="empty">無符合資料</td></tr>';
+  if(document.getElementById('trashCard').style.display!=='none') renderTrash();
   renderStats();
+}
+function groupAgg(rows, key){
+  const map={};
+  rows.forEach(s=>{
+    const k=s[key]||'(空白)';
+    if(!map[k]) map[k]={qty:0,amt:0,cnt:0};
+    map[k].qty+=Number(s.qty)||0; map[k].amt+=Number(s.total)||0; map[k].cnt++;
+  });
+  return map;
 }
 function renderStats(){
   const rows=getFiltered();
   const totalQty=rows.reduce((a,s)=>a+(Number(s.qty)||0),0);
   const totalAmt=rows.reduce((a,s)=>a+(Number(s.total)||0),0);
+  const unpaidAmt=rows.filter(s=>s.pay_status==='unpaid').reduce((a,s)=>a+(Number(s.total)||0),0);
   document.getElementById('statCards').innerHTML=`
-    <div class="stat"><div class="v">${rows.length}</div><div class="l">筆數</div></div>
+    <div class="stat info"><div class="v">${rows.length}</div><div class="l">筆數</div></div>
     <div class="stat"><div class="v">${money(totalQty)}</div><div class="l">總數量</div></div>
-    <div class="stat"><div class="v">${money(totalAmt)}</div><div class="l">總金額</div></div>`;
+    <div class="stat"><div class="v">${money(totalAmt)}</div><div class="l">總金額</div></div>
+    <div class="stat warn"><div class="v">${money(unpaidAmt)}</div><div class="l">未收金額</div></div>`;
   const by=document.getElementById('q_groupby').value;
+  let by2=document.getElementById('q_groupby2').value;
+  if(by2===by) by2='';
   const wrap=document.getElementById('statTableWrap');
   if(!by){ wrap.style.display='none'; return; }
   wrap.style.display='block';
-  const keyName={date:'日期',code:'品號',product:'品項',spec:'規格',customer:'客戶名稱'}[by];
-  const map={};
-  rows.forEach(s=>{
-    const k=s[by]||'(空白)';
-    if(!map[k]) map[k]={qty:0,amt:0,cnt:0};
-    map[k].qty+=Number(s.qty)||0; map[k].amt+=Number(s.total)||0; map[k].cnt++;
+  const head=document.getElementById('statHead');
+  const body=document.getElementById('statBody');
+  if(!by2){
+    const entries=Object.entries(groupAgg(rows,by)).sort((a,b)=>b[1].amt-a[1].amt);
+    head.innerHTML=`<tr><th>${KEY_NAME[by]}</th><th class="num">筆數</th><th class="num">數量小計</th><th class="num">金額小計</th></tr>`;
+    body.innerHTML=entries.map(([k,v])=>`<tr>
+      <td>${esc(k)}</td><td class="num">${v.cnt}</td><td class="num">${money(v.qty)}</td><td class="num">${money(v.amt)}</td>
+    </tr>`).join('')+`<tr style="font-weight:800;background:#f0f9ff">
+      <td>總計</td><td class="num">${rows.length}</td><td class="num">${money(totalQty)}</td><td class="num">${money(totalAmt)}</td></tr>`;
+  }else{
+    // 交叉統計：主維度 × 次維度
+    const outer={};
+    rows.forEach(s=>{
+      const k1=s[by]||'(空白)', k2=s[by2]||'(空白)';
+      if(!outer[k1]) outer[k1]={amt:0,sub:{}};
+      if(!outer[k1].sub[k2]) outer[k1].sub[k2]={qty:0,amt:0,cnt:0};
+      outer[k1].amt+=Number(s.total)||0;
+      const o=outer[k1].sub[k2];
+      o.qty+=Number(s.qty)||0; o.amt+=Number(s.total)||0; o.cnt++;
+    });
+    head.innerHTML=`<tr><th>${KEY_NAME[by]}</th><th>${KEY_NAME[by2]}</th><th class="num">筆數</th><th class="num">數量小計</th><th class="num">金額小計</th></tr>`;
+    let html='';
+    Object.entries(outer).sort((a,b)=>b[1].amt-a[1].amt).forEach(([k1,g])=>{
+      const subs=Object.entries(g.sub).sort((a,b)=>b[1].amt-a[1].amt);
+      subs.forEach(([k2,v],i)=>{
+        html+=`<tr><td>${i===0?('<b>'+esc(k1)+'</b>'):''}</td><td>${esc(k2)}</td>
+          <td class="num">${v.cnt}</td><td class="num">${money(v.qty)}</td><td class="num">${money(v.amt)}</td></tr>`;
+      });
+      html+=`<tr style="background:#f8fafc;font-weight:700"><td></td><td>小計</td>
+        <td class="num"></td><td class="num"></td><td class="num">${money(g.amt)}</td></tr>`;
+    });
+    html+=`<tr style="font-weight:800;background:#f0f9ff"><td>總計</td><td></td>
+      <td class="num">${rows.length}</td><td class="num">${money(totalQty)}</td><td class="num">${money(totalAmt)}</td></tr>`;
+    body.innerHTML=html;
+  }
+}
+
+/* ===================== 報表 ===================== */
+function renderReport(){
+  const sales = activeSales();
+  const now = new Date();
+  const mk = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  // 近 12 個月
+  const months=[];
+  for(let i=11;i>=0;i--){ months.push(mk(new Date(now.getFullYear(), now.getMonth()-i, 1))); }
+  const byMonth={};
+  sales.forEach(s=>{ const k=String(s.date||'').slice(0,7); byMonth[k]=(byMonth[k]||0)+(Number(s.total)||0); });
+  const curKey=months[11], prevKey=months[10];
+  const curAmt=byMonth[curKey]||0, prevAmt=byMonth[prevKey]||0;
+  const deltaTxt = prevAmt>0 ? (curAmt>=prevAmt?'▲ +':'▼ ')+Math.round((curAmt-prevAmt)/prevAmt*100)+'%' : '—';
+  const unpaidAll = sales.filter(s=>s.pay_status==='unpaid').reduce((a,s)=>a+(Number(s.total)||0),0);
+  const pendingAll = sales.filter(s=>s.pay_status==='pending').reduce((a,s)=>a+(Number(s.total)||0),0);
+  document.getElementById('rptCards').innerHTML=`
+    <div class="stat info"><div class="v">${money(curAmt)}</div><div class="l">本月營收</div></div>
+    <div class="stat info"><div class="v">${money(prevAmt)}</div><div class="l">上月營收</div></div>
+    <div class="stat"><div class="v">${deltaTxt}</div><div class="l">本月 vs 上月</div></div>
+    <div class="stat warn"><div class="v">${money(unpaidAll)}</div><div class="l">未收款總額</div></div>
+    <div class="stat pend"><div class="v">${money(pendingAll)}</div><div class="l">待確認金額</div></div>`;
+  // 長條圖 (SVG)
+  const vals = months.map(k=>byMonth[k]||0);
+  const maxV = Math.max(...vals, 1);
+  const base=200, top=24;
+  let svg = `<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" style="min-width:640px;width:100%">`;
+  svg += `<line x1="20" y1="${base}" x2="700" y2="${base}" stroke="#e5e7eb" stroke-width="1"/>`;
+  months.forEach((k,i)=>{
+    const v=vals[i];
+    const h=Math.round((base-top)*v/maxV);
+    const x=28+i*56, w=38;
+    const fill = i===11 ? 'var(--brand-dark)' : '#93c5fd';
+    svg += `<rect x="${x}" y="${base-h}" width="${w}" height="${h}" rx="4" fill="${fill}"/>`;
+    if(v>0) svg += `<text x="${x+w/2}" y="${base-h-5}" text-anchor="middle" font-size="10" fill="#374151">${shortMoney(v)}</text>`;
+    svg += `<text x="${x+w/2}" y="${base+16}" text-anchor="middle" font-size="11" fill="#6b7280">${Number(k.slice(5,7))}月</text>`;
   });
-  const entries=Object.entries(map).sort((a,b)=>b[1].amt-a[1].amt);
-  document.getElementById('statHead').innerHTML=`<tr><th>${keyName}</th><th class="num">筆數</th><th class="num">數量小計</th><th class="num">金額小計</th></tr>`;
-  document.getElementById('statBody').innerHTML=entries.map(([k,v])=>`<tr>
-    <td>${esc(k)}</td><td class="num">${v.cnt}</td><td class="num">${money(v.qty)}</td><td class="num">${money(v.amt)}</td>
-  </tr>`).join('')+`<tr style="font-weight:800;background:#f0f9ff">
-    <td>總計</td><td class="num">${rows.length}</td><td class="num">${money(totalQty)}</td><td class="num">${money(totalAmt)}</td></tr>`;
+  svg += `</svg>`;
+  document.getElementById('rptChart').innerHTML = vals.some(v=>v>0) ? svg : '<p class="empty">尚無銷貨資料</p>';
+  // 排行榜（依區間）
+  const period=document.getElementById('rpt_period').value;
+  let start='';
+  if(period==='m0') start=mk(now)+'-01';
+  if(period==='m3') start=mk(new Date(now.getFullYear(),now.getMonth()-2,1))+'-01';
+  if(period==='m12') start=mk(new Date(now.getFullYear(),now.getMonth()-11,1))+'-01';
+  const inRange = sales.filter(s=>!start || String(s.date)>=start);
+  const custMap = groupAgg(inRange,'customer');
+  const custRows = Object.entries(custMap).sort((a,b)=>b[1].amt-a[1].amt).slice(0,10);
+  document.getElementById('rptCustBody').innerHTML = custRows.length ? custRows.map(([k,v],i)=>`<tr>
+    <td>${i+1}</td><td>${esc(k)}</td><td class="num">${v.cnt}</td><td class="num">${money(v.amt)}</td>
+  </tr>`).join('') : '<tr><td colspan="4" class="empty">此區間無資料</td></tr>';
+  const prodMap = {};
+  inRange.forEach(s=>{
+    const k=s.product+(s.spec?' '+s.spec:'');
+    if(!prodMap[k]) prodMap[k]={qty:0,amt:0};
+    prodMap[k].qty+=Number(s.qty)||0; prodMap[k].amt+=Number(s.total)||0;
+  });
+  const prodRows = Object.entries(prodMap).sort((a,b)=>b[1].amt-a[1].amt).slice(0,10);
+  document.getElementById('rptProdBody').innerHTML = prodRows.length ? prodRows.map(([k,v],i)=>`<tr>
+    <td>${i+1}</td><td>${esc(k)}</td><td class="num">${money(v.qty)}</td><td class="num">${money(v.amt)}</td>
+  </tr>`).join('') : '<tr><td colspan="4" class="empty">此區間無資料</td></tr>';
+  // 未收款依客戶（全部期間）
+  const unpaidMap = groupAgg(sales.filter(s=>s.pay_status==='unpaid'),'customer');
+  const unpaidRows = Object.entries(unpaidMap).sort((a,b)=>b[1].amt-a[1].amt);
+  document.getElementById('rptUnpaidBody').innerHTML = unpaidRows.length ? unpaidRows.map(([k,v])=>`<tr>
+    <td>${esc(k)}</td><td class="num">${v.cnt}</td><td class="num" style="color:var(--warn);font-weight:700">${money(v.amt)}</td>
+  </tr>`).join('') : '<tr><td colspan="3" class="empty">目前沒有未收款 🎉</td></tr>';
 }
 
 /* ===================== 商品管理 ===================== */
@@ -561,7 +919,7 @@ function saveProduct(){
     row=db.products.find(x=>x.id===editId);
     row.code=code; row.name=name; row.spec=spec; row.price=price; toast('已更新商品');
   }else{
-    if(db.products.length>=50) return toast('商品數量過多');
+    if(db.products.length>=50) return toast('商品數量已達上限 50 個');
     row={id:uid(),code,name,spec,price}; db.products.push(row); toast('已新增商品');
   }
   saveDB(); supaUpsert(T.products, row); resetProductForm(); renderProducts();
@@ -662,10 +1020,11 @@ function exportDetailExcel(){
   if(!rows.length) return toast('無資料可匯出');
   const data=rows.map(s=>({
     '日期':s.date,'品號':s.code,'品項':s.product,'規格':s.spec||'','數量':s.qty,
-    '單價':s.price,'總價':s.total,'客戶名稱':s.customer,'備註':s.note||''
+    '單價':s.price,'總價':s.total,'客戶名稱':s.customer,
+    '收款狀態':PAY_LABEL[s.pay_status||'pending'],'備註':s.note||''
   }));
   const ws=XLSX.utils.json_to_sheet(data);
-  ws['!cols']=[{wch:12},{wch:10},{wch:16},{wch:12},{wch:8},{wch:10},{wch:12},{wch:16},{wch:24}];
+  ws['!cols']=[{wch:12},{wch:10},{wch:16},{wch:12},{wch:8},{wch:10},{wch:12},{wch:16},{wch:10},{wch:24}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'銷貨明細');
   XLSX.writeFile(wb,`銷貨明細_${todayStr()}.xlsx`);
@@ -675,22 +1034,37 @@ function exportStatsExcel(){
   const rows=getFiltered();
   if(!rows.length) return toast('無資料可匯出');
   const by=document.getElementById('q_groupby').value;
+  let by2=document.getElementById('q_groupby2').value;
+  if(by2===by) by2='';
   if(!by) return toast('請先選擇統計維度');
-  const keyName={date:'日期',code:'品號',product:'品項',spec:'規格',customer:'客戶名稱'}[by];
-  const map={};
-  rows.forEach(s=>{
-    const k=s[by]||'(空白)';
-    if(!map[k]) map[k]={qty:0,amt:0,cnt:0};
-    map[k].qty+=Number(s.qty)||0; map[k].amt+=Number(s.total)||0; map[k].cnt++;
-  });
-  const data=Object.entries(map).sort((a,b)=>b[1].amt-a[1].amt).map(([k,v])=>({
-    [keyName]:k,'筆數':v.cnt,'數量小計':v.qty,'金額小計':v.amt
-  }));
+  let data, cols, sheetName;
+  if(!by2){
+    data=Object.entries(groupAgg(rows,by)).sort((a,b)=>b[1].amt-a[1].amt).map(([k,v])=>({
+      [KEY_NAME[by]]:k,'筆數':v.cnt,'數量小計':v.qty,'金額小計':v.amt
+    }));
+    cols=[{wch:18},{wch:8},{wch:12},{wch:14}];
+    sheetName='統計_'+KEY_NAME[by];
+  }else{
+    const flat=[];
+    const outer={};
+    rows.forEach(s=>{
+      const k1=s[by]||'(空白)', k2=s[by2]||'(空白)';
+      const key=JSON.stringify([k1,k2]);
+      if(!outer[key]) outer[key]={k1,k2,qty:0,amt:0,cnt:0};
+      outer[key].qty+=Number(s.qty)||0; outer[key].amt+=Number(s.total)||0; outer[key].cnt++;
+    });
+    Object.values(outer).sort((a,b)=>a.k1.localeCompare(b.k1,'zh-Hant')||b.amt-a.amt).forEach(o=>{
+      flat.push({[KEY_NAME[by]]:o.k1,[KEY_NAME[by2]]:o.k2,'筆數':o.cnt,'數量小計':o.qty,'金額小計':o.amt});
+    });
+    data=flat;
+    cols=[{wch:18},{wch:18},{wch:8},{wch:12},{wch:14}];
+    sheetName='交叉統計';
+  }
   const ws=XLSX.utils.json_to_sheet(data);
-  ws['!cols']=[{wch:18},{wch:8},{wch:12},{wch:14}];
+  ws['!cols']=cols;
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'統計_'+keyName);
-  XLSX.writeFile(wb,`銷貨統計_依${keyName}_${todayStr()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb,ws,sheetName);
+  XLSX.writeFile(wb,`銷貨統計_${todayStr()}.xlsx`);
   toast('已匯出統計 Excel');
 }
 
@@ -701,7 +1075,27 @@ function backupData(){
   a.href=URL.createObjectURL(blob);
   a.download=`銷貨系統備份_${todayStr()}.json`;
   a.click(); URL.revokeObjectURL(a.href);
+  localStorage.setItem(BACKUP_TS_KEY, String(Date.now()));
+  document.getElementById('backupBanner').style.display='none';
   toast('已匯出備份檔');
+}
+function snoozeBackup(){
+  localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now()+86400000));
+  document.getElementById('backupBanner').style.display='none';
+}
+function checkBackupBanner(){
+  const n=db.products.length+db.customers.length+db.sales.length;
+  if(!n) return;
+  const last=Number(localStorage.getItem(BACKUP_TS_KEY))||0;
+  if(!last){
+    // 從未備份過:以今天為起算日,滿 7 天才提醒
+    localStorage.setItem(BACKUP_TS_KEY, String(Date.now()));
+    return;
+  }
+  const snooze=Number(localStorage.getItem(BACKUP_SNOOZE_KEY))||0;
+  if(Date.now()-last>7*86400000 && Date.now()>snooze){
+    document.getElementById('backupBanner').style.display='flex';
+  }
 }
 function restoreData(ev){
   const file=ev.target.files[0]; if(!file) return;
@@ -712,12 +1106,9 @@ function restoreData(ev){
       if(!obj.products||!obj.customers||!obj.sales) throw 0;
       if(!confirm('還原會覆蓋目前所有資料,確定繼續?')) return;
       db={products:obj.products,customers:obj.customers,sales:obj.sales};
-      db.sales.forEach(s=>{
-        if(s.productId!==undefined && s.product_id===undefined){ s.product_id=s.productId; delete s.productId; }
-        if(s.customerId!==undefined && s.customer_id===undefined){ s.customer_id=s.customerId; delete s.customerId; }
-      });
+      migrateSales(db.sales);
       saveDB(); refreshAllViews();
-      if(sbReady) sbUploadLocal();
+      if(sbReady) sbUploadLocalNow();
       toast('已還原備份');
     }catch(e){ toast('檔案格式錯誤,無法還原'); }
     ev.target.value='';
@@ -728,19 +1119,20 @@ function restoreData(ev){
 /* ===================== 雲端同步 (Supabase) ===================== */
 function setSyncChip(state, text){
   const chip=document.getElementById('syncChip');
-  const icon={local:'⚪',ok:'🟢',sync:'🔵',err:'🔴'}[state]||'⚪';
+  const icon={local:'⚪',ok:'🟢',sync:'🔵',err:'🔴',queue:'🟠'}[state]||'⚪';
   chip.textContent=icon+' '+text;
 }
 function setCloudStatus(text){
   const el=document.getElementById('cloudStatus'); if(el) el.textContent='目前狀態：'+text;
 }
 function refreshAllViews(){
-  refreshSaleSelects(); renderRecent(); renderProducts(); renderCustomers(); renderList();
+  refreshSaleSelects(); renderRecent(); renderProducts(); renderCustomers(); renderList(); renderReport();
 }
 function renderCloud(){
   document.getElementById('sb_url').value=sbUrl;
   document.getElementById('sb_key').value=sbKey;
   document.getElementById('sqlCode').textContent=SQL_CODE;
+  document.getElementById('cloudVer').textContent='目前程式版本：v'+APP_VERSION;
   setCloudStatus(sbReady?'已連線，多裝置即時同步中。':(sbUrl?'已設定，但尚未連線成功。':'未連線（僅存本機）。'));
 }
 function copySQL(){
@@ -763,9 +1155,19 @@ async function sbFetchAll(){
   if(p.error) throw p.error;
   if(c.error) throw c.error;
   if(s.error) throw s.error;
-  db = { products:p.data||[], customers:c.data||[], sales:s.data||[] };
+  const cloud = { products:p.data||[], customers:c.data||[], sales:s.data||[] };
+  const cloudCount = cloud.products.length + cloud.customers.length + cloud.sales.length;
+  const localCount = db.products.length + db.customers.length + db.sales.length;
+  if(cloudCount===0 && localCount>0){
+    // 雲端全空但本機有資料：絕不覆蓋本機，交由呼叫端決定是否上傳
+    return 'cloud-empty';
+  }
+  db = cloud;
+  migrateSales(db.sales);
   localStorage.setItem(DB_KEY, JSON.stringify(db));
+  purgeOldTrash();
   refreshAllViews();
+  return 'applied';
 }
 function sbSubscribe(){
   try{
@@ -777,27 +1179,80 @@ function sbSubscribe(){
   }catch(e){ console.error(e); }
 }
 function sbOnRemoteChange(){
+  if(getOps().length) return; // 本機還有待同步的變更時先不覆蓋
   clearTimeout(sbRefetchTimer);
   sbRefetchTimer=setTimeout(()=>{
-    if(!sbReady) return;
+    if(!sbReady || getOps().length) return;
     sbFetchAll().then(()=>setSyncChip('ok','已同步')).catch(()=>{});
   }, 400);
 }
-function supaUpsert(table, row){
-  if(!sbReady) return;
-  setSyncChip('sync','同步中…');
-  sb.from(table).upsert(row).then(({error})=>{
-    setSyncChip(error?'err':'ok', error?'同步失敗':'已同步');
-    if(error) console.error(error);
+/* ---- 離線佇列：斷網時先記下來，恢復後自動補傳 ---- */
+function getOps(){
+  try{ return JSON.parse(localStorage.getItem(OPS_KEY)||'[]'); }catch(e){ return []; }
+}
+function setOps(a){ localStorage.setItem(OPS_KEY, JSON.stringify(a)); }
+function queueOp(table, op, payload){
+  const id = op==='delete' ? payload : payload.id;
+  const ops = getOps().filter(o=>{
+    const oid = o.op==='delete' ? o.payload : o.payload.id;
+    return !(o.table===table && oid===id);
   });
+  ops.push({q:uid(), table, op, payload});
+  setOps(ops);
+}
+async function flushQueue(){
+  if(flushing) return;
+  if(!sbReady || !sb){
+    const n=getOps().length;
+    if(n) setSyncChip('queue','待同步 '+n+' 筆');
+    return;
+  }
+  const ops = getOps();
+  if(!ops.length){ setSyncChip('ok','已同步'); return; }
+  flushing = true;
+  setSyncChip('sync','同步中…');
+  try{
+    while(true){
+      const cur = getOps();
+      if(!cur.length) break;
+      const o = cur[0];
+      let res;
+      if(o.op==='delete'){
+        res = await sb.from(o.table).delete().eq('id', o.payload);
+      }else{
+        res = await sb.from(o.table).upsert(o.payload);
+      }
+      if(res.error) throw res.error;
+      // 依識別碼移除(而非位置):若這筆在傳送期間被更新的操作取代,取代者會留在佇列接著送
+      setOps(getOps().filter(x=>x.q!==o.q));
+    }
+    setSyncChip('ok','已同步');
+  }catch(e){
+    console.error(e);
+    setSyncChip('err','同步失敗(會自動重試)');
+  }finally{
+    flushing = false;
+  }
+}
+function supaUpsert(table, row){
+  if(!sbUrl || !sbKey) return;
+  queueOp(table,'upsert',row);
+  flushQueue();
 }
 function supaDelete(table, id){
-  if(!sbReady) return;
-  setSyncChip('sync','同步中…');
-  sb.from(table).delete().eq('id',id).then(({error})=>{
-    setSyncChip(error?'err':'ok', error?'同步失敗':'已同步');
-    if(error) console.error(error);
-  });
+  if(!sbUrl || !sbKey) return;
+  queueOp(table,'delete',id);
+  flushQueue();
+}
+let reconnecting = false;
+function sbTryReconnect(){
+  // 離線開啟後恢復網路時，自動重新連線並補傳佇列
+  if(sbReady || reconnecting || !sbUrl || !sbKey) return;
+  if(!sb && !sbInit()) return;
+  reconnecting = true;
+  sbFetchAll().then(()=>{
+    sbReady = true; sbSubscribe(); setSyncChip('ok','已同步'); flushQueue();
+  }).catch(()=>{}).finally(()=>{ reconnecting = false; });
 }
 function sbConnect(){
   const url=document.getElementById('sb_url').value.trim().replace(/\/+$/,'');
@@ -808,9 +1263,14 @@ function sbConnect(){
   localStorage.setItem(SB_URL_KEY,url); localStorage.setItem(SB_KEY_KEY,key);
   if(!sbInit()) return toast('連線元件尚未載入，請重新整理頁面再試');
   setSyncChip('sync','連線中…'); setCloudStatus('連線中…');
-  sbFetchAll().then(()=>{
+  sbFetchAll().then(r=>{
     sbReady=true; sbSubscribe();
     setSyncChip('ok','已同步'); setCloudStatus('已連線，多裝置即時同步中。'); toast('已連線雲端');
+    if(r==='cloud-empty'){
+      setCloudStatus('已連線。雲端目前是空的，本機資料保持不動。');
+      if(confirm('雲端目前是空的，這台裝置有資料。\n要把本機資料上傳到雲端嗎？')) sbUploadLocalNow();
+    }
+    flushQueue();
   }).catch(err=>{
     sbReady=false; console.error(err);
     setSyncChip('err','連線失敗');
@@ -820,13 +1280,20 @@ function sbConnect(){
 }
 function sbReload(){
   if(!sbReady) return toast('尚未連線');
+  if(getOps().length) return toast('還有資料待同步，請稍候再重新載入');
   setSyncChip('sync','載入中…');
-  sbFetchAll().then(()=>{ setSyncChip('ok','已同步'); toast('已重新載入'); })
-    .catch(()=>{ setSyncChip('err','載入失敗'); toast('載入失敗'); });
+  sbFetchAll().then(r=>{
+    setSyncChip('ok','已同步');
+    toast(r==='cloud-empty' ? '雲端目前是空的，已保留本機資料' : '已重新載入');
+  }).catch(()=>{ setSyncChip('err','載入失敗'); toast('載入失敗'); });
 }
 function sbUploadLocal(){
   if(!sbReady) return toast('請先連線雲端');
-  if(!confirm('把本機目前的商品/客戶/銷貨全部上傳到雲端（同 id 會覆蓋），確定？')) return;
+  if(!confirm('把本機資料「合併上傳」到雲端？\n相同編號的資料以本機版本為準；雲端多出來的資料會保留。')) return;
+  sbUploadLocalNow();
+}
+function sbUploadLocalNow(){
+  if(!sbReady) return toast('請先連線雲端');
   setSyncChip('sync','上傳中…'); setCloudStatus('上傳中…');
   Promise.all([
     db.products.length ? sb.from(T.products).upsert(db.products) : Promise.resolve({}),
@@ -835,10 +1302,10 @@ function sbUploadLocal(){
   ]).then(res=>{
     const bad=res.find(r=>r && r.error);
     if(bad) throw bad.error;
-    setSyncChip('ok','已同步'); setCloudStatus('已把本機資料上傳雲端。'); toast('已上傳到雲端');
+    setSyncChip('ok','已同步'); setCloudStatus('已把本機資料合併上傳雲端。'); toast('已上傳到雲端');
   }).catch(e=>{
     console.error(e); setSyncChip('err','上傳失敗');
-    setCloudStatus('上傳失敗，請確認建表 SQL 已執行成功。'); toast('上傳失敗');
+    setCloudStatus('上傳失敗，請確認建表 SQL（含新欄位）已執行成功。'); toast('上傳失敗');
   });
 }
 function sbDisconnect(){
@@ -848,7 +1315,7 @@ function sbDisconnect(){
   setSyncChip('local','本機'); setCloudStatus('已中斷連線（僅存本機）。'); toast('已中斷雲端連線');
 }
 
-const SQL_CODE = `-- 客戶銷貨系統 — Supabase 建表（到 SQL Editor 貼上整段，按 Run）
+const SQL_CODE = `-- 客戶銷貨系統 — Supabase 建表（到 SQL Editor 貼上整段，按 Run；可重複執行）
 create table if not exists sales_products (
   id text primary key, code text, name text, spec text, price numeric default 0
 );
@@ -858,8 +1325,12 @@ create table if not exists sales_customers (
 create table if not exists sales_records (
   id text primary key, date text, product_id text, code text, product text, spec text,
   qty numeric default 0, price numeric default 0, total numeric default 0,
-  customer_id text, customer text, note text
+  customer_id text, customer text, note text,
+  pay_status text default 'pending', deleted boolean default false, deleted_at text
 );
+alter table sales_records add column if not exists pay_status text default 'pending';
+alter table sales_records add column if not exists deleted boolean default false;
+alter table sales_records add column if not exists deleted_at text;
 
 alter table sales_products  enable row level security;
 alter table sales_customers enable row level security;
@@ -870,23 +1341,34 @@ drop policy if exists "allow all" on sales_customers;
 drop policy if exists "allow all" on sales_records;
 create policy "allow all" on sales_products  for all using (true) with check (true);
 create policy "allow all" on sales_customers for all using (true) with check (true);
-create policy "allow all" on sales_records   for all using (true) with check (true);
-
-alter publication supabase_realtime add table sales_products;
-alter publication supabase_realtime add table sales_customers;
-alter publication supabase_realtime add table sales_records;`;
+create policy "allow all" on sales_records   for all using (true) with check (true);`;
 
 /* ===================== 初始化 ===================== */
 loadDB();
+purgeOldTrash();
 resetSaleForm();
 refreshSaleSelects();
 renderRecent();
+checkBackupBanner();
+document.getElementById('verLine').textContent='客戶銷貨系統 v'+APP_VERSION;
 if(sbUrl && sbKey && sbInit()){
   setSyncChip('sync','載入中…');
-  sbFetchAll().then(()=>{ sbReady=true; sbSubscribe(); setSyncChip('ok','已同步'); })
-    .catch(()=>setSyncChip('err','離線（用本機）'));
+  sbFetchAll().then(()=>{
+    sbReady=true; sbSubscribe(); setSyncChip('ok','已同步'); flushQueue();
+  }).catch(()=>{
+    const n=getOps().length;
+    setSyncChip(n?'queue':'err', n?('離線,待同步 '+n+' 筆'):'離線（用本機）');
+  });
 }else{
   setSyncChip('local','本機');
+}
+window.addEventListener('online', ()=>{ if(sbReady) flushQueue(); else sbTryReconnect(); });
+setInterval(()=>{
+  if(!sbReady){ sbTryReconnect(); return; }
+  if(getOps().length && !flushing) flushQueue();
+}, 45000);
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
 }
 </script>
 </body>
